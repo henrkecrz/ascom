@@ -103,7 +103,7 @@ interface CategoryRule {
 const CATEGORY_RULES: CategoryRule[] = [
   {
     category: 'obras_infraestrutura',
-    weight: 1,
+    weight: 3, // Boosted to take precedence over generic comms
     patterns: [
       /asfalto/i, /buraco/i, /paviment/i, /cal[cç]ada/i, /\bobra\b/i, /\bobras\b/i,
       /desabamento/i, /desmoron/i, /ponte\b/i, /viaduto/i, /rachadura/i, /trinca/i,
@@ -119,7 +119,7 @@ const CATEGORY_RULES: CategoryRule[] = [
   },
   {
     category: 'meio_ambiente_saneamento',
-    weight: 1,
+    weight: 3, // Boosted to take precedence
     patterns: [
       /[aá]rvore/i, /poda/i, /alagamento/i, /drenagem\s*pluvial/i,
       /parque/i, /jardim/i, /[aá]rea\s*verde/i, /enchente/i, /inunda[cç]/i,
@@ -135,28 +135,8 @@ const CATEGORY_RULES: CategoryRule[] = [
     ],
   },
   {
-    category: 'atendimento_imprensa',
-    weight: 1,
-    patterns: [
-      /imprensa/i, /jornalista/i, /rep[oó]rter/i, /m[ií]dia/i, /fake\s*news/i,
-      /vazamento\s*(de\s*)?(informa|dados|documento)/i, /entrevista/i, /coletiva/i,
-      /nota\s*(oficial|[aà]\s*imprensa)/i, /press\s*release/i, /release/i,
-      /mat[eé]ria/i, /reportagem/i, /televis[aã]o/i, /\btv\b/i, /r[aá]dio/i,
-      /jornal\b/i, /rede\s*social/i, /viral/i, /comunicado/i, /declara[cç][aã]o/i,
-      /assessoria\s*(de\s*)?comunica/i, /resposta\s*[àa]\s*imprensa/i,
-      /porta.?voz/i, /interlocu[cç]/i, /repercuss[aã]o/i, /crise\s*(de\s*)?imagem/i,
-      /desinforma[cç]/i, /boato/i, /exposi[cç][aã]o\s*negativa/i,
-      /manchete/i, /editorial/i, /opini[aã]o\s*p[uú]blica/i, /trending/i,
-      /hashtag/i, /viraliz/i, /influenciador/i, /youtuber/i, /blogueiro/i,
-      /\bascom\b/i, /comunica[cç][aã]o\s*(social|institucional|corporativa)/i,
-      /crise\s*de\s*comunica/i, /gest[aã]o\s*de\s*(crise|imagem)/i,
-      /silenciar/i, /omiss[aã]o/i, /transpar[eê]ncia/i, /posicionamento/i,
-      /retra[cç][aã]o/i, /desmentir/i, /esclarecimento/i, /nota\s*de\s*repúdio/i,
-    ],
-  },
-  {
     category: 'gestao_governanca',
-    weight: 1,
+    weight: 2,
     patterns: [
       /greve/i, /manifesta[cç]/i, /licita[cç]/i, /contrato/i, /sindic[aâ]ncia/i,
       /investiga[cç]/i, /auditoria/i, /terceirizado/i, /concurso/i,
@@ -176,7 +156,7 @@ const CATEGORY_RULES: CategoryRule[] = [
   },
   {
     category: 'seguranca_saude',
-    weight: 1,
+    weight: 2,
     patterns: [
       /acidente\s*(de\s*trabalho|fatal|grave)?/i, /seguran[cç]a\s*(do\s*trabalho|ocupacional|p[uú]blica)/i,
       /interdi[cç][aã]o/i, /sinaliza[cç]/i, /\bepi\b/i, /sa[uú]de/i,
@@ -189,6 +169,16 @@ const CATEGORY_RULES: CategoryRule[] = [
       /equipamento\s*de\s*prote/i, /capacete/i, /isolamento/i,
       /\bcovid/i, /pandemia/i, /epidemia/i, /surto/i, /dengue/i,
       /atropelamento/i, /colis[aã]o/i, /capotamento/i, /trânsito/i,
+    ],
+  },
+  {
+    category: 'atendimento_imprensa',
+    weight: 0.5, // Reduced weight since all scenarios have comms keywords
+    patterns: [
+      /vazamento/i, /fake\s*news/i, /crise\s*(de\s*)?imagem/i,
+      /desinforma[cç]/i, /boato/i, /viral/i, /trending/i, /hashtag/i,
+      /influenciador/i, /youtuber/i, /blogueiro/i, /hacker/i, /ciberataque/i,
+      /site\s*fora\s*do\s*ar/i, /vazamento\s*de\s*dados/i,
     ],
   },
 ];

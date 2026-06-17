@@ -73,7 +73,6 @@ export function CrisisPanel({ onSelectDoc }: Props) {
   const endCrisis = () => {
     if (confirm('Tem certeza que deseja encerrar o incidente ativo?')) {
       setActiveCrisis(null)
-      // Opcional: Limpar checklist ao encerrar para estar pronto para a próxima
       saveProgress.mutate({})
     }
   }
@@ -84,14 +83,15 @@ export function CrisisPanel({ onSelectDoc }: Props) {
         margin: '-20px', 
         padding: '20px', 
         minHeight: 'calc(100vh - 60px)', 
-        background: 'radial-gradient(circle at top, #2b0b0b 0%, var(--bg-default) 100%)',
-        position: 'relative'
+        background: '#050505',
+        position: 'relative',
+        color: '#fff'
       }}>
         {/* Animated grid overlay for command center feel */}
         <div style={{
-          position: 'absolute', inset: 0, opacity: 0.03, pointerEvents: 'none',
-          backgroundImage: 'linear-gradient(rgba(255, 60, 60, 0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 60, 60, 0.5) 1px, transparent 1px)',
-          backgroundSize: '30px 30px'
+          position: 'absolute', inset: 0, opacity: 0.05, pointerEvents: 'none',
+          backgroundImage: 'linear-gradient(rgba(255, 60, 60, 0.8) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 60, 60, 0.8) 1px, transparent 1px)',
+          backgroundSize: '40px 40px'
         }} />
 
         <div style={{ position: 'relative', zIndex: 1, maxWidth: 1400, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -115,128 +115,164 @@ export function CrisisPanel({ onSelectDoc }: Props) {
 
   // STANDBY MODE
   return (
-    <div className="page-container" style={{ maxWidth: 1200, margin: '0 auto' }}>
-      {/* Hero Section */}
+    <div style={{ 
+      margin: '-20px', padding: '40px', minHeight: 'calc(100vh - 60px)', 
+      background: '#0a0a0a', color: '#fff', position: 'relative', overflow: 'hidden' 
+    }}>
+      {/* Background Dot Matrix */}
       <div style={{
-        background: 'linear-gradient(135deg, var(--bg-card) 0%, var(--bg-elevated) 100%)',
-        borderRadius: theme.radius.lg,
-        border: '1px solid var(--border-subtle)',
-        padding: '30px 40px',
-        marginBottom: 30,
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        boxShadow: theme.shadows.md,
-        position: 'relative'
-      }}>
-        {/* Decoration */}
-        <div style={{ position: 'absolute', right: -50, top: -50, width: 250, height: 250, background: `${crisisColor}15`, borderRadius: '50%', filter: 'blur(50px)', pointerEvents: 'none', zIndex: 0 }} />
-        
-        <div style={{ position: 'relative', zIndex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-            <Shield size={28} style={{ color: crisisColor }} />
-            <h1 style={{ margin: 0, fontSize: '1.8rem', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.5px' }}>
-              Centro de Prontidão
-            </h1>
+        position: 'absolute', inset: 0, opacity: 0.03, pointerEvents: 'none',
+        backgroundImage: 'radial-gradient(circle, #fff 1px, transparent 1px)',
+        backgroundSize: '20px 20px'
+      }} />
+
+      <div style={{ maxWidth: 1200, margin: '0 auto', position: 'relative', zIndex: 1 }}>
+        {/* Hero Section */}
+        <div style={{
+          background: 'rgba(20, 20, 20, 0.8)',
+          borderRadius: 16,
+          border: '1px solid rgba(255,255,255,0.05)',
+          padding: '40px',
+          marginBottom: 30,
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          boxShadow: '0 20px 40px rgba(0,0,0,0.5)',
+          backdropFilter: 'blur(20px)'
+        }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+              <Shield size={32} color="#4ade80" />
+              <h1 style={{ margin: 0, fontSize: '2.2rem', fontWeight: 900, letterSpacing: '-1px' }}>
+                Centro de Prontidão
+              </h1>
+            </div>
+            <p style={{ margin: 0, fontSize: '1rem', color: 'rgba(255,255,255,0.6)', maxWidth: 600, lineHeight: 1.6 }}>
+              Aguardando incidentes. Monitore a saúde dos protocolos de crise, os porta-vozes designados e o checklist de resposta rápida.
+            </p>
           </div>
-          <p style={{ margin: 0, fontSize: '0.95rem', color: 'var(--text-secondary)', maxWidth: 500, lineHeight: 1.5 }}>
-            Monitore a saúde dos protocolos de crise, os porta-vozes designados e o checklist de resposta rápida. Em caso de evento adverso, declare o incidente abaixo.
-          </p>
-        </div>
-        
-        <div style={{ position: 'relative', zIndex: 2 }}>
-          <button onClick={() => setShowSelector(!showSelector)}
-            style={{
-              padding: '16px 32px',
-              background: `linear-gradient(135deg, ${crisisColor} 0%, #a01010 100%)`,
-              border: 'none',
-              borderRadius: 30,
-              color: '#fff',
-              cursor: 'pointer', fontWeight: 800, fontSize: '0.9rem',
-              letterSpacing: '1px',
-              fontFamily: 'inherit', transition: 'all 0.3s',
-              display: 'flex', alignItems: 'center', gap: 8,
-              boxShadow: `0 8px 25px ${crisisColor}40`,
-              transform: showSelector ? 'scale(0.98)' : 'scale(1)'
-            }}
-            onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.02) translateY(-2px)'}
-            onMouseLeave={e => e.currentTarget.style.transform = 'scale(1) translateY(0)'}
-          >
-            <AlertTriangle size={18} fill="#fff" color={crisisColor} />
-            DECLARAR INCIDENTE
-          </button>
           
-          {showSelector && (
-            <div style={{
-              position: 'absolute', top: '100%', right: 0, marginTop: 12,
-              background: 'var(--bg-card)', border: '1px solid var(--border-subtle)',
-              borderRadius: theme.radius.lg, padding: 20, width: 380,
-              boxShadow: theme.shadows.lg, zIndex: 10,
-              backdropFilter: 'blur(10px)'
-            }}>
-              <h3 style={{ margin: '0 0 16px', fontSize: '1rem', fontWeight: 800, borderBottom: '1px solid var(--border-subtle)', paddingBottom: 10 }}>Selecione o Protocolo Afetado</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 300, overflowY: 'auto', paddingRight: 4 }}>
-                {protocols.length === 0 && <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Nenhum protocolo cadastrado.</span>}
-                {protocols.map((p: any) => (
-                  <button key={p.id} onClick={() => startCrisis(p.id)} style={{
-                    padding: '12px 16px', background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)',
-                    borderRadius: theme.radius.md, color: 'var(--text-primary)', fontSize: '0.85rem',
-                    textAlign: 'left', cursor: 'pointer', transition: 'all 0.2s',
-                    display: 'flex', flexDirection: 'column', gap: 4
-                  }} onMouseEnter={e => { e.currentTarget.style.borderColor = crisisColor; e.currentTarget.style.background = `${crisisColor}08` }} onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-subtle)'; e.currentTarget.style.background = 'var(--bg-elevated)' }}>
-                    <span style={{ fontWeight: 700 }}>{p.name}</span>
-                    {p.summary && <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.summary}</span>}
-                  </button>
-                ))}
+          <button onClick={() => setShowSelector(true)}
+            style={{
+              padding: '20px 40px',
+              background: `linear-gradient(135deg, #ff2a2a 0%, #a00000 100%)`,
+              border: 'none',
+              borderRadius: 8,
+              color: '#fff',
+              cursor: 'pointer', fontWeight: 900, fontSize: '1.1rem',
+              letterSpacing: '2px', textTransform: 'uppercase',
+              display: 'flex', alignItems: 'center', gap: 12,
+              boxShadow: `0 0 30px rgba(255, 42, 42, 0.4)`,
+              transition: 'all 0.3s'
+            }}
+            onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.05)'; e.currentTarget.style.boxShadow = '0 0 50px rgba(255, 42, 42, 0.6)'; }}
+            onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = '0 0 30px rgba(255, 42, 42, 0.4)'; }}
+          >
+            <AlertTriangle size={24} fill="#fff" color="#ff2a2a" />
+            Declarar Incidente
+          </button>
+        </div>
+
+        {/* Stats row */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 3fr', gap: 24, marginBottom: 30 }}>
+          {/* Score Card (Radar Style) */}
+          <div style={{ padding: '30px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(20, 20, 20, 0.8)', borderRadius: 16, border: '1px solid rgba(255,255,255,0.05)', boxShadow: '0 10px 30px rgba(0,0,0,0.3)' }}>
+            <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '2px', marginBottom: 24 }}>Índice de Prontidão</div>
+            
+            <div style={{ position: 'relative', width: 160, height: 160, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', border: '1px dashed rgba(255,255,255,0.1)', animation: 'spin 20s linear infinite' }} />
+              <svg width="160" height="160" viewBox="0 0 160 160" style={{ transform: 'rotate(-90deg)', position: 'absolute' }}>
+                <circle cx="80" cy="80" r="70" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="12" />
+                <circle cx="80" cy="80" r="70" fill="none" 
+                  stroke={readiness.score >= 80 ? '#4ade80' : readiness.score >= 40 ? '#fbbf24' : '#ff2a2a'} 
+                  strokeWidth="12"
+                  strokeDasharray={`${2 * Math.PI * 70}`}
+                  strokeDashoffset={`${2 * Math.PI * 70 * (1 - readiness.score / 100)}`}
+                  strokeLinecap="round"
+                  style={{ transition: 'stroke-dashoffset 1.5s cubic-bezier(0.4, 0, 0.2, 1)' }} 
+                />
+              </svg>
+              <div style={{ position: 'absolute', fontSize: '3rem', fontWeight: 900, color: '#fff', textShadow: '0 0 20px rgba(255,255,255,0.3)' }}>
+                {readiness.score}%
               </div>
             </div>
-          )}
-        </div>
-      </div>
-
-      {/* Stats row */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 3fr', gap: 20, marginBottom: 30 }}>
-        {/* Score Card */}
-        <div className="card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-card)' }}>
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 16 }}>Índice de Prontidão</div>
-          
-          <div style={{ position: 'relative', width: 120, height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <svg width="120" height="120" viewBox="0 0 120 120" style={{ transform: 'rotate(-90deg)' }}>
-              <circle cx="60" cy="60" r="54" fill="none" stroke="var(--border-subtle)" strokeWidth="8" />
-              <circle cx="60" cy="60" r="54" fill="none" 
-                stroke={readiness.score >= 80 ? 'var(--color-success)' : readiness.score >= 40 ? 'var(--color-warning)' : crisisColor} 
-                strokeWidth="8"
-                strokeDasharray={`${2 * Math.PI * 54}`}
-                strokeDashoffset={`${2 * Math.PI * 54 * (1 - readiness.score / 100)}`}
-                strokeLinecap="round"
-                style={{ transition: 'stroke-dashoffset 1s ease, stroke 0.5s ease' }} 
-              />
-            </svg>
-            <div style={{ position: 'absolute', fontSize: '2.2rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-              {readiness.score}%
+            
+            <div style={{ display: 'flex', gap: 24, marginTop: 30, width: '100%', justifyContent: 'center' }}>
+              <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: 8, minWidth: 100 }}>
+                <CheckCircle2 size={24} style={{ color: readiness.hasProtocols ? '#4ade80' : 'rgba(255,255,255,0.2)', margin: '0 auto 8px' }} />
+                <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.6)', fontWeight: 700, letterSpacing: 1 }}>PROTOCOLOS</div>
+              </div>
+              <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: 8, minWidth: 100 }}>
+                <Users size={24} style={{ color: readiness.hasSpokespersons ? '#4ade80' : 'rgba(255,255,255,0.2)', margin: '0 auto 8px' }} />
+                <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.6)', fontWeight: 700, letterSpacing: 1 }}>PORTA-VOZES</div>
+              </div>
             </div>
           </div>
-          
-          <div style={{ display: 'flex', gap: 16, marginTop: 24, width: '100%', justifyContent: 'space-around' }}>
-            <div style={{ textAlign: 'center' }}>
-              <CheckCircle2 size={20} style={{ color: readiness.hasProtocols ? 'var(--color-success)' : 'var(--border-subtle)', margin: '0 auto 4px' }} />
-              <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>PROTOCOLOS</div>
-            </div>
-            <div style={{ textAlign: 'center' }}>
-              <Users size={20} style={{ color: readiness.hasSpokespersons ? 'var(--color-success)' : 'var(--border-subtle)', margin: '0 auto 4px' }} />
-              <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>PORTA-VOZES</div>
-            </div>
+
+          {/* Protocols Grid */}
+          <div style={{ background: 'rgba(20, 20, 20, 0.8)', borderRadius: 16, border: '1px solid rgba(255,255,255,0.05)', padding: 24 }}>
+            <CrisisProtocols protocols={protocols} crisisMode={false} onSelectDoc={onSelectDoc} />
           </div>
         </div>
 
-        {/* Protocols Grid */}
-        <div style={{ height: '100%' }}>
-          <CrisisProtocols protocols={protocols} crisisMode={false} onSelectDoc={onSelectDoc} />
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+          <div style={{ background: 'rgba(20, 20, 20, 0.8)', borderRadius: 16, border: '1px solid rgba(255,255,255,0.05)', padding: 24 }}>
+            <CrisisChecklist checklist={checklist} checkedSteps={checkedSteps} crisisMode={false} onToggle={handleToggleStep} />
+          </div>
+          <div style={{ background: 'rgba(20, 20, 20, 0.8)', borderRadius: 16, border: '1px solid rgba(255,255,255,0.05)', padding: 24 }}>
+            <CrisisSpokespersons spokespersons={spokespersons} />
+          </div>
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-        <CrisisChecklist checklist={checklist} checkedSteps={checkedSteps} crisisMode={false} onToggle={handleToggleStep} />
-        <CrisisSpokespersons spokespersons={spokespersons} />
-      </div>
+      {/* FULL-SCREEN IMMERSIVE MODAL FOR PROTOCOL SELECTION */}
+      {showSelector && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 9999,
+          background: 'rgba(0, 0, 0, 0.8)', backdropFilter: 'blur(20px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          animation: 'fadeIn 0.3s ease-out'
+        }}>
+          <div style={{
+            background: 'linear-gradient(180deg, rgba(30,0,0,0.9) 0%, rgba(10,0,0,1) 100%)',
+            border: '1px solid #ff2a2a', borderRadius: 16,
+            padding: 40, width: '100%', maxWidth: 600,
+            boxShadow: '0 0 100px rgba(255,42,42,0.2)',
+            display: 'flex', flexDirection: 'column', gap: 20,
+            transform: 'scale(1)', animation: 'zoomIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,42,42,0.3)', paddingBottom: 20 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <AlertTriangle size={32} color="#ff2a2a" />
+                <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 900, color: '#fff', letterSpacing: 1, textTransform: 'uppercase' }}>
+                  Selecione o Protocolo Afetado
+                </h2>
+              </div>
+              <button onClick={() => setShowSelector(false)} style={{
+                background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.5)', fontSize: '2rem', cursor: 'pointer', lineHeight: 1
+              }}>&times;</button>
+            </div>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxHeight: '50vh', overflowY: 'auto', paddingRight: 8 }}>
+              {protocols.length === 0 && <div style={{ color: 'rgba(255,255,255,0.5)', textAlign: 'center', padding: 40 }}>Nenhum protocolo de crise encontrado na base de dados.</div>}
+              {protocols.map((p: any) => (
+                <button key={p.id} onClick={() => startCrisis(p.id)} style={{
+                  padding: '20px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: 8, color: '#fff', textAlign: 'left', cursor: 'pointer', transition: 'all 0.2s',
+                  display: 'flex', flexDirection: 'column', gap: 8
+                }} onMouseEnter={e => { e.currentTarget.style.borderColor = '#ff2a2a'; e.currentTarget.style.background = 'rgba(255,42,42,0.1)' }} onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; e.currentTarget.style.background = 'rgba(255,255,255,0.05)' }}>
+                  <span style={{ fontWeight: 800, fontSize: '1.1rem' }}>{p.name}</span>
+                  {p.summary && <span style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.6)', lineHeight: 1.4 }}>{p.summary}</span>}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+      
+      <style>{`
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes zoomIn { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+      `}</style>
     </div>
   )
 }
