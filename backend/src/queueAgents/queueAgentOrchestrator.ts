@@ -5,7 +5,7 @@ import { insertQueueAgentLog } from './logs';
 import { QueueAgentContext, QueueAgentStage, QueueAgentExecutor, QueueAgentJob, QueueAgentResult } from './types';
 
 function toQueueAgentStage(stage: string): QueueAgentStage | null {
-  const valid = ['extract', 'analyze', 'structure', 'relations', 'clusters', 'knowledge', 'risk', 'simulator'];
+  const valid = ['extract', 'analyze', 'structure', 'relations', 'clusters', 'knowledge', 'risk', 'simulator', 'site_sync'];
   return valid.includes(stage) ? stage as QueueAgentStage : null;
 }
 
