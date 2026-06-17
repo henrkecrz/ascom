@@ -6,6 +6,14 @@ import { getProviderConfig, listProviders, normalizeProvider, AIProvider } from 
 
 const router = Router();
 
+type ManagedScope = 'interactive_agents' | 'queue_agents' | 'site_agents';
+
+const SCOPE_PREFIX: Record<ManagedScope, string> = {
+  interactive_agents: 'ai_interactive',
+  queue_agents: 'ai_queue',
+  site_agents: 'ai_site',
+};
+
 function modelId(provider: AIProvider, model: any): string | null {
   if (!model) return null;
   if (typeof model === 'string') return model;
@@ -58,17 +66,51 @@ function storedCredential(scope?: string): string {
   try { return decrypt(encrypted); } catch { return ''; }
 }
 
+function parseSavedModels(value: string | undefined | null): string[] {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.filter((item) => typeof item === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveModelsForScope(scope: string | undefined, models: string[], error?: string): void {
+  const prefix = profilePrefix(scope);
+  if (!prefix) return;
+  setSetting(`${prefix}_available_models`, JSON.stringify(Array.from(new Set(models))));
+  setSetting(`${prefix}_models_updated_at`, new Date().toISOString());
+  setSetting(`${prefix}_models_error`, error || '');
+}
+
 function sanitizeProfilesForSettings(): any {
   const profiles: any = getAIProfiles();
-  const scopes = [
-    ['interactive_agents', 'ai_interactive'],
-    ['queue_agents', 'ai_queue'],
-    ['site_agents', 'ai_site'],
-  ];
-  for (const [scope, prefix] of scopes) {
-    if (profiles[scope] && !getSetting(`${prefix}_model`)) profiles[scope].model = '';
+  for (const [scope, prefix] of Object.entries(SCOPE_PREFIX)) {
+    if (!profiles[scope]) continue;
+    if (!getSetting(`${prefix}_model`)) profiles[scope].model = '';
+    profiles[scope].availableModels = parseSavedModels(getSetting(`${prefix}_available_models`));
+    profiles[scope].modelsUpdatedAt = getSetting(`${prefix}_models_updated_at`) || '';
+    profiles[scope].modelsError = getSetting(`${prefix}_models_error`) || '';
   }
   return profiles;
+}
+
+function providersForSettings() {
+  return listProviders().map((provider) => ({ ...provider, defaultModel: '' }));
+}
+
+function saveAllProfileSettings(profiles: any): void {
+  saveAIProfiles(profiles);
+  for (const [scope, prefix] of Object.entries(SCOPE_PREFIX)) {
+    const profile = profiles?.[scope];
+    if (!profile) continue;
+    if (Array.isArray(profile.availableModels)) {
+      setSetting(`${prefix}_available_models`, JSON.stringify(Array.from(new Set(profile.availableModels))));
+    }
+    if (profile.modelsUpdatedAt !== undefined) setSetting(`${prefix}_models_updated_at`, String(profile.modelsUpdatedAt || ''));
+    if (profile.modelsError !== undefined) setSetting(`${prefix}_models_error`, String(profile.modelsError || ''));
+  }
 }
 
 async function fetchModelsForSettings(providerInput: string, baseUrlInput?: string, scope?: string, providedCredential?: string): Promise<{ models: string[]; error?: string }> {
@@ -82,12 +124,20 @@ async function fetchModelsForSettings(providerInput: string, baseUrlInput?: stri
 
   try {
     const response = await fetch(url, { signal: AbortSignal.timeout(10000), headers });
-    if (!response.ok) return { models: [], error: `HTTP ${response.status}` };
+    if (!response.ok) {
+      const error = `HTTP ${response.status}`;
+      saveModelsForScope(scope, [], error);
+      return { models: [], error };
+    }
     const json = await response.json() as any;
     const rawModels = provider === 'ollama' ? (json.models || []) : (json.data || json.models || []);
-    return { models: sortModels(provider, rawModels) };
+    const models = sortModels(provider, rawModels);
+    saveModelsForScope(scope, models, '');
+    return { models };
   } catch (e: any) {
-    return { models: [], error: e.message || 'Erro ao buscar modelos do provedor' };
+    const error = e.message || 'Erro ao buscar modelos do provedor';
+    saveModelsForScope(scope, [], error);
+    return { models: [], error };
   }
 }
 
@@ -115,7 +165,7 @@ router.get('/api/settings', (_req: Request, res: Response) => {
     ai_potency: getSetting('ai_potency') || '0.7',
     store_original_files: getSetting('store_original_files') || 'true',
     ai_profiles: sanitizeProfilesForSettings(),
-    providers: listProviders(),
+    providers: providersForSettings(),
   });
 });
 
@@ -135,13 +185,13 @@ router.post('/api/settings', (req: Request, res: Response) => {
 });
 
 router.get('/api/settings/ai-profiles', (_req: Request, res: Response) => {
-  res.json({ profiles: sanitizeProfilesForSettings(), providers: listProviders() });
+  res.json({ profiles: sanitizeProfilesForSettings(), providers: providersForSettings() });
 });
 
 router.post('/api/settings/ai-profiles', (req: Request, res: Response) => {
   const profiles = req.body?.profiles || {};
-  saveAIProfiles(profiles);
-  res.json({ success: true, profiles: sanitizeProfilesForSettings(), providers: listProviders() });
+  saveAllProfileSettings(profiles);
+  res.json({ success: true, profiles: sanitizeProfilesForSettings(), providers: providersForSettings() });
 });
 
 router.post('/api/settings/ai-profiles/test', async (req: Request, res: Response) => {
@@ -155,7 +205,7 @@ router.post('/api/settings/ai-profiles/test', async (req: Request, res: Response
 });
 
 router.get('/api/settings/providers', (_req: Request, res: Response) => {
-  res.json({ providers: listProviders() });
+  res.json({ providers: providersForSettings() });
 });
 
 router.get('/api/settings/models', async (req: Request, res: Response) => {
