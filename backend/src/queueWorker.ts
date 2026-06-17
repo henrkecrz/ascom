@@ -1,5 +1,5 @@
 import { getNextPending, claimItem, completeItem, QueueItem, getExponentialDelay } from './queue';
-import { getFileById, getDatabase } from './database';
+import { getFileById, getDatabase, createDocumentVersion, createChangeEventFromVersions, getLatestDocumentVersion } from './database';
 import { extractText, isExtractable } from './processors/textExtractor';
 import { extractKeywords, generateSummary, extractTopics, clearTfIdfCache } from './analysis/nlpService';
 import { classifyWithAI, getDocTypeLabel } from './analysis/aiClassifier';
@@ -22,6 +22,8 @@ let isRunning = false;
 let paused = false;
 let itemsProcessed = 0;
 let currentItem: { id: number; file_id: number; stage: string; file_name: string } | null = null;
+
+const preAnalyzeVersions = new Map<number, any | null>();
 
 export function getCurrentProcessing(): { id: number; file_id: number; stage: string; file_name: string } | null {
   return currentItem;
@@ -161,6 +163,9 @@ async function processItem(item: QueueItem, signal: AbortSignal): Promise<void> 
 }
 
 async function processExtract(doc: any, signal: AbortSignal): Promise<void> {
+  const oldVersion = getLatestDocumentVersion(doc.id) || createDocumentVersion(doc.id);
+  preAnalyzeVersions.set(doc.id, oldVersion);
+
   if (!doc.extension || !isExtractable(doc.extension)) {
     const db = getDatabase();
     if (db) {
@@ -206,6 +211,7 @@ async function processAnalyze(doc: any, signal: AbortSignal): Promise<void> {
       db.run(`INSERT INTO document_summary (file_id, summary, keywords, topics, word_count) VALUES (?, '', '', '', 0)`,
         [doc.id]);
     }
+    finalizeDocumentVersioning(doc.id);
     return;
   }
 
@@ -229,6 +235,19 @@ async function processAnalyze(doc: any, signal: AbortSignal): Promise<void> {
   const entities = await extractEntitiesAsync(rawText);
   if (db) {
     db.run('UPDATE files SET entities = ? WHERE id = ?', [serializeEntities(entities), doc.id]);
+  }
+
+  finalizeDocumentVersioning(doc.id);
+}
+
+function finalizeDocumentVersioning(fileId: number): void {
+  try {
+    const oldVersion = preAnalyzeVersions.get(fileId) || null;
+    const newVersion = createDocumentVersion(fileId);
+    if (newVersion) createChangeEventFromVersions(fileId, oldVersion, newVersion);
+    preAnalyzeVersions.delete(fileId);
+  } catch (err: any) {
+    logger.warn('Falha ao registrar versão/mudança documental', { fileId, error: err?.message });
   }
 }
 
@@ -254,7 +273,7 @@ async function processStructure(doc: any, signal: AbortSignal): Promise<void> {
       clsStmt.free();
       await processDocxIntelligently(doc.full_path, doc.id, docType);
     } catch (err: any) {
-      logger.warn(`Erro ao processar DOCX: ${doc.name}`, { error: err?.message });
+      logger.warn(`Erro ao processar DOCX: ${doc.name}`, { error: err.message });
     }
   }
 }
@@ -358,51 +377,30 @@ async function handleSimulatorStage(textDocs: { id: number; text: string }[], si
         options: scenario.options,
         difficulty: scenario.difficulty || 'medio',
         category: scenario.category || docType,
-        source: 'ai-auto',
+        source: 'ai-docs',
       });
-      logger.info('Cenário gerado automaticamente pela fila', { category: scenario.category || docType });
+      logger.info('Cenário gerado automaticamente', { title: scenario.title });
     }
   }
 
-  const existingCategories = getScenarioCategories().map(c => c.category);
-  const extraCount = Math.max(1, 3 - existingCategories.length);
-  const generated = await generateScenarios(extraCount);
-  for (const s of generated) {
-    insertScenario({
-      title: s.title,
-      description: s.description,
-      options: s.options,
-      difficulty: s.difficulty || 'medio',
-      category: s.category || 'geral',
-      source: 'ai-auto',
-    });
-  }
-  logger.info('Cenários do simulador gerados', { total: generated.length + (crisisDocs.length > 0 ? 1 : 0) });
-
-  const existingTPCount = getTalkingPoints().length;
-  const tpCount = Math.max(1, 3 - existingTPCount);
-  for (let i = 0; i < tpCount; i++) {
-    let context: string | undefined;
-    if (crisisDocs.length > 0) {
-      const idx = i % crisisDocs.length;
-      const f = db.prepare('SELECT name FROM files WHERE id = ?');
-      f.bind([crisisDocs[idx].id]);
-      if (f.step()) {
-        const name = String(f.getAsObject().name);
-        context = `Documento relacionado: ${name}\nConteúdo: ${crisisDocs[idx].text.substring(0, 1000)}`;
+  const existingTP = getTalkingPoints();
+  if (existingTP.length < 5) {
+    const sensitiveDocs = textDocs.slice(0, 3);
+    for (const doc of sensitiveDocs) {
+      try {
+        const tp = await generateTalkingPoints(doc.text.substring(0, 1500));
+        if (tp) {
+          insertTalkingPoint({
+            title: tp.title,
+            category: tp.category,
+            approved: tp.approved,
+            restricted: tp.restricted,
+            source: 'ai',
+          });
+        }
+      } catch (err: any) {
+        logger.warn('Erro ao gerar talking point', { error: err.message });
       }
-      f.free();
-    }
-    const tp = await generateTalkingPoints(context);
-    if (tp) {
-      insertTalkingPoint({
-        title: tp.title,
-        category: tp.category,
-        approved: tp.approved,
-        restricted: tp.restricted,
-        source: 'ai-auto',
-      });
     }
   }
-  logger.info('Talking points gerados automaticamente pela fila');
 }
