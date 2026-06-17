@@ -44,23 +44,6 @@ function sortModels(provider: AIProvider, rawModels: any[]): string[] {
   return Array.from(new Set(rawModels.map((raw) => modelId(provider, raw)).filter(Boolean) as string[]));
 }
 
-function fallbackModels(provider: AIProvider): string[] {
-  if (provider === 'openrouter') {
-    return [
-      'deepseek/deepseek-r1:free',
-      'deepseek/deepseek-chat-v3-0324:free',
-      'qwen/qwen3-235b-a22b:free',
-      'meta-llama/llama-3.3-70b-instruct:free',
-      'openai/gpt-4o-mini',
-      'anthropic/claude-3.5-sonnet',
-      'google/gemini-flash-1.5',
-    ];
-  }
-  if (provider === 'openai') return ['gpt-5.5', 'gpt-5.5-mini', 'gpt-4.1-mini', 'gpt-4o-mini'];
-  if (provider === 'ollama') return ['llama3.2:latest', 'deepseek-r1:latest', 'qwen2.5:latest', 'mistral:latest'];
-  return ['opencode/deepseek-v4-flash-free', 'opencode/mimo-v2.5-free', 'opencode/north-mini-code-free', 'opencode/nemotron-3-ultra-free', 'opencode/big-pickle'];
-}
-
 function profilePrefix(scope?: string): string | null {
   if (scope === 'interactive_agents') return 'ai_interactive';
   if (scope === 'queue_agents') return 'ai_queue';
@@ -75,7 +58,7 @@ function storedCredential(scope?: string): string {
   try { return decrypt(encrypted); } catch { return ''; }
 }
 
-async function fetchModelsForSettings(providerInput: string, baseUrlInput?: string, scope?: string, providedCredential?: string): Promise<string[]> {
+async function fetchModelsForSettings(providerInput: string, baseUrlInput?: string, scope?: string, providedCredential?: string): Promise<{ models: string[]; error?: string }> {
   const provider = normalizeProvider(providerInput);
   const config = getProviderConfig(provider);
   const baseUrl = (baseUrlInput || config.baseUrl).replace(/\/+$/, '');
@@ -86,13 +69,12 @@ async function fetchModelsForSettings(providerInput: string, baseUrlInput?: stri
 
   try {
     const response = await fetch(url, { signal: AbortSignal.timeout(10000), headers });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    if (!response.ok) return { models: [], error: `HTTP ${response.status}` };
     const json = await response.json() as any;
     const rawModels = provider === 'ollama' ? (json.models || []) : (json.data || json.models || []);
-    const models = sortModels(provider, rawModels);
-    return models.length > 0 ? models : fallbackModels(provider);
-  } catch {
-    return fallbackModels(provider);
+    return { models: sortModels(provider, rawModels) };
+  } catch (e: any) {
+    return { models: [], error: e.message || 'Erro ao buscar modelos do provedor' };
   }
 }
 
@@ -116,7 +98,7 @@ router.get('/api/settings', (_req: Request, res: Response) => {
     ai_api_key_masked: masked,
     ai_has_api_key: hasKey,
     ai_base_url: getSetting('ai_base_url') || config.baseUrl,
-    ai_model: getSetting('ai_model') || config.defaultModel,
+    ai_model: getSetting('ai_model') || '',
     ai_potency: getSetting('ai_potency') || '0.7',
     store_original_files: getSetting('store_original_files') || 'true',
     ai_profiles: getAIProfiles(),
@@ -167,8 +149,8 @@ router.get('/api/settings/models', async (req: Request, res: Response) => {
   const provider = normalizeProvider(String(req.query.provider || 'opencode'));
   const baseUrl = req.query.baseUrl ? String(req.query.baseUrl) : undefined;
   const scope = req.query.scope ? String(req.query.scope) : undefined;
-  const models = await fetchModelsForSettings(provider, baseUrl, scope);
-  res.json({ provider, models, all: models, filtered: false });
+  const result = await fetchModelsForSettings(provider, baseUrl, scope);
+  res.json({ provider, models: result.models, all: result.models, filtered: false, error: result.error });
 });
 
 router.post('/api/settings/provider-models', async (req: Request, res: Response) => {
@@ -176,8 +158,8 @@ router.post('/api/settings/provider-models', async (req: Request, res: Response)
   const baseUrl = req.body?.baseUrl ? String(req.body.baseUrl) : undefined;
   const scope = req.body?.scope ? String(req.body.scope) : undefined;
   const providedCredential = req.body?.credential ? String(req.body.credential) : undefined;
-  const models = await fetchModelsForSettings(provider, baseUrl, scope, providedCredential);
-  res.json({ provider, models, all: models, filtered: false });
+  const result = await fetchModelsForSettings(provider, baseUrl, scope, providedCredential);
+  res.json({ provider, models: result.models, all: result.models, filtered: false, error: result.error });
 });
 
 router.post('/api/settings/test-model', async (req: Request, res: Response) => {
