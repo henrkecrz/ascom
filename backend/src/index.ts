@@ -37,6 +37,7 @@ import calendarRouter from './routes/calendar';
 import advisorRouter from './routes/advisor';
 import talkingPointsRouter from './routes/talkingPoints';
 import scannerRouter from './routes/scanner';
+import agentsRouter from './routes/agents';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -84,6 +85,7 @@ app.use(calendarRouter);
 app.use(advisorRouter);
 app.use(talkingPointsRouter);
 app.use(scannerRouter);
+app.use(agentsRouter);
 
 // Global error handler
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
