@@ -64,7 +64,7 @@ function computeMd5(filePath: string): Promise<string> {
     const hash = crypto.createHash('md5');
     const stream = fs.createReadStream(filePath);
     stream.on('data', (data) => hash.update(data));
-    stream.on('end', () => resolve(hash.digest('hex'));
+    stream.on('end', () => resolve(hash.digest('hex')));
     stream.on('error', reject);
   });
 }
