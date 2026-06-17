@@ -1,6 +1,5 @@
-import { getSetting } from '../database';
-import { decrypt } from '../lib/crypto';
 import { logger } from '../lib/logger';
+import { callScopedLLM } from '../services/aiProfile';
 
 export interface InferredColumn {
   name: string;
@@ -119,12 +118,11 @@ const URL_RE = /^https?:\/\/[^\s$.?#].[^\s]*$/i;
 
 function parseAIResponse(text: string): Partial<InferredSchema> | null {
   try {
-    const jsonMatch = text.match(/\{[\s\S]*"dataType"[\s\S]*\}/);
-    if (!jsonMatch) return null;
-    const parsed = JSON.parse(jsonMatch[0]);
-    if (parsed.dataType && Array.isArray(parsed.columns)) {
-      return parsed;
-    }
+    const start = text.indexOf('{');
+    const end = text.lastIndexOf('}');
+    if (start < 0 || end <= start) return null;
+    const parsed = JSON.parse(text.slice(start, end + 1));
+    if (parsed.dataType && Array.isArray(parsed.columns)) return parsed;
   } catch {}
   return null;
 }
@@ -132,16 +130,13 @@ function parseAIResponse(text: string): Partial<InferredSchema> | null {
 export function inferColumnType(values: string[]): InferredColumn['type'] {
   const cleaned = values.filter(v => v != null && v !== '');
   if (cleaned.length === 0) return 'TEXT';
-
   const nonNull = cleaned.map(v => String(v).trim()).filter(Boolean);
   if (nonNull.length === 0) return 'TEXT';
-
   const total = nonNull.length;
-  let matchCount: Record<InferredColumn['type'], number> = {
+  const matchCount: Record<InferredColumn['type'], number> = {
     INTEGER: 0, REAL: 0, DATE: 0, BOOLEAN: 0, TEXT: 0, JSON: 0,
     CPF: 0, CNPJ: 0, CEP: 0, PHONE: 0, EMAIL: 0, URL: 0
   };
-
   for (const val of nonNull) {
     if (BOOLEAN_RE.test(val)) matchCount.BOOLEAN++;
     else if (CPF_RE.test(val)) matchCount.CPF++;
@@ -155,22 +150,13 @@ export function inferColumnType(values: string[]): InferredColumn['type'] {
     else if (DATE_RE.test(val)) matchCount.DATE++;
     else matchCount.TEXT++;
   }
-
   const threshold = 0.7;
   const candidates: [InferredColumn['type'], number][] = [
-    ['BOOLEAN', matchCount.BOOLEAN / total],
-    ['CPF', matchCount.CPF / total],
-    ['CNPJ', matchCount.CNPJ / total],
-    ['CEP', matchCount.CEP / total],
-    ['PHONE', matchCount.PHONE / total],
-    ['EMAIL', matchCount.EMAIL / total],
-    ['URL', matchCount.URL / total],
-    ['INTEGER', matchCount.INTEGER / total],
-    ['REAL', matchCount.REAL / total],
-    ['DATE', matchCount.DATE / total],
-    ['TEXT', matchCount.TEXT / total],
+    ['BOOLEAN', matchCount.BOOLEAN / total], ['CPF', matchCount.CPF / total], ['CNPJ', matchCount.CNPJ / total],
+    ['CEP', matchCount.CEP / total], ['PHONE', matchCount.PHONE / total], ['EMAIL', matchCount.EMAIL / total],
+    ['URL', matchCount.URL / total], ['INTEGER', matchCount.INTEGER / total], ['REAL', matchCount.REAL / total],
+    ['DATE', matchCount.DATE / total], ['TEXT', matchCount.TEXT / total],
   ];
-
   candidates.sort((a, b) => b[1] - a[1]);
   return candidates[0][1] >= threshold ? candidates[0][0] : 'TEXT';
 }
@@ -198,36 +184,22 @@ function detectTypeByName(name: string): string | null {
   return null;
 }
 
-function heuristicInfer(
-  name: string,
-  sampleData: any[],
-  extension: string
-): InferredSchema {
+function heuristicInfer(name: string, sampleData: any[], extension: string): InferredSchema {
   const columns = sampleData.length > 0 ? Object.keys(sampleData[0]) : [];
-
   const nameType = detectTypeByName(name);
   const colType = columns.length > 0 ? detectTypeByColumns(columns) : null;
   const dataType = nameType || colType || 'desconhecido';
-
   let confidence = 0.4;
   if (nameType && colType && nameType === colType) confidence = 0.75;
   else if (nameType) confidence = 0.6;
   else if (colType) confidence = 0.5;
   if (extension === '.csv' || extension === '.xlsx') confidence = Math.min(confidence + 0.1, 1);
-
   const inferredColumns: InferredColumn[] = columns.map(col => {
     const values = sampleData.map(r => String(r[col] ?? ''));
     const type = inferColumnType(values);
     const nullable = values.some(v => v === '' || v === null || v === undefined);
-    return {
-      name: col,
-      type,
-      description: `Coluna ${col}`,
-      nullable,
-      sampleValues: values.slice(0, 5).filter(Boolean),
-    };
+    return { name: col, type, description: `Coluna ${col}`, nullable, sampleValues: values.slice(0, 5).filter(Boolean) };
   });
-
   return {
     dataType,
     confidence,
@@ -240,67 +212,25 @@ function heuristicInfer(
   };
 }
 
-export async function inferSchema(
-  name: string,
-  sampleData: any[],
-  extension: string,
-  fullText?: string
-): Promise<InferredSchema> {
-  const encryptedKey = getSetting('ai_api_key');
-  const apiKey = encryptedKey ? decrypt(encryptedKey) : '';
-  const baseUrl = getSetting('ai_base_url') || 'https://opencode.ai/zen/v1';
-  const model = getSetting('ai_model') || 'opencode/deepseek-v4-flash-free';
-
-  const hasValidKey = apiKey && apiKey.trim().length > 5;
-
+export async function inferSchema(name: string, sampleData: any[], extension: string, fullText?: string): Promise<InferredSchema> {
   const fallback = (): InferredSchema => heuristicInfer(name, sampleData, extension);
-
-  if (!hasValidKey) return fallback();
-
   const sampleJson = JSON.stringify(sampleData.slice(0, 5), null, 2);
   const textPreview = fullText ? fullText.substring(0, 2000) : '';
 
   try {
-    const response = await fetch(`${baseUrl}/chat/completions`, {
-      method: 'POST',
-      signal: AbortSignal.timeout(15000),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: model.replace(/^[^/]+\//, ''),
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          {
-            role: 'user',
-            content: `Nome do arquivo: ${name}\nExtensão: ${extension}\n\nAmostra dos dados (primeiras linhas):\n${sampleJson}\n\nTexto extraído:\n${textPreview}`,
-          },
-        ],
-        temperature: 0.1,
-        max_tokens: 500,
-      }),
-    });
+    const content = await callScopedLLM('queue_agents', [
+      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'user', content: `Nome do arquivo: ${name}\nExtensão: ${extension}\n\nAmostra dos dados (primeiras linhas):\n${sampleJson}\n\nTexto extraído:\n${textPreview}` },
+    ], { temperature: 0.1, maxTokens: 500, timeoutMs: 15000 });
 
-    if (!response.ok) {
-      logger.warn(`Schema inferrer API error, falling back to heuristics`, { status: response.status });
-      return fallback();
-    }
-
-    const data = await response.json() as any;
-    const content = data.choices?.[0]?.message?.content;
     if (!content) return fallback();
-
     const aiResult = parseAIResponse(content);
     if (!aiResult) return fallback();
 
-    const heuristic = heuristicInfer(name, sampleData, extension);
+    const heuristic = fallback();
     const columns = aiResult.columns!.map(col => {
       const rawValues = sampleData.map(r => String(r[col.name] ?? ''));
-      return {
-        ...col,
-        sampleValues: rawValues.slice(0, 5).filter(Boolean),
-      };
+      return { ...col, sampleValues: rawValues.slice(0, 5).filter(Boolean) };
     });
 
     const schema: InferredSchema = {
@@ -314,15 +244,7 @@ export async function inferSchema(
       suggestedDashboard: aiResult.suggestedDashboard || heuristic.suggestedDashboard,
     };
 
-    if (schema.confidence < 0.5) {
-      schema.dataType = heuristic.dataType;
-      schema.confidence = heuristic.confidence * 0.8;
-      schema.tableName = heuristic.tableName;
-      schema.columns = heuristic.columns;
-      schema.description = heuristic.description;
-      schema.suggestedDashboard = heuristic.suggestedDashboard;
-    }
-
+    if (schema.confidence < 0.5) return { ...heuristic, confidence: heuristic.confidence * 0.8 };
     return schema;
   } catch (e: any) {
     logger.warn('Schema inferrer API error, falling back to heuristics', { message: e.message });
