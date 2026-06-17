@@ -1,4 +1,4 @@
-import { QueueItem } from '../queue';
+import type { QueueItem } from '../queue';
 import { logger } from '../lib/logger';
 import { getQueueAgent } from './queueAgentRegistry';
 import { insertQueueAgentLog } from './logs';
