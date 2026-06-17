@@ -142,7 +142,15 @@ export function CrisisSimulator() {
 
   const activeScenario = scenarios[currentIdx]
   const categoryLabels: Record<string, string> = {
-    crise: 'Crise',
+    // Novas categorias operacionais da Novacap
+    obras_infraestrutura: 'Obras & Infraestrutura',
+    meio_ambiente_saneamento: 'Meio Ambiente & Saneamento',
+    atendimento_imprensa: 'Comunicação & Imprensa',
+    gestao_governanca: 'Gestão & Governança',
+    seguranca_saude: 'Segurança & Saúde',
+
+    // Tipos de documentos legados/existentes
+    crise: 'Gestão de Crise',
     porta_voz: 'Porta-Voz',
     relacionamento: 'Relacionamento',
     normativa_diretriz: 'Normativas',

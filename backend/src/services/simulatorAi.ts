@@ -15,6 +15,7 @@ interface Scenario {
   description: string;
   options: ScenarioOption[];
   difficulty?: string;
+  category?: string;
   source?: string;
 }
 
@@ -27,12 +28,19 @@ Cada cenário deve:
 - Ter 3 opções de resposta: uma excelente (100 pts), uma mediana (10-30 pts), e uma péssima (0 pts)
 - Incluir feedback detalhado explicando POR QUE cada resposta é adequada ou inadequada
 - Seguir as diretrizes do plano de comunicação: transparência, rapidez, alinhamento com diretoria, proteção da imagem institucional
+- Estar categorizado em um dos seguintes eixos de crise/operação da Novacap:
+  * obras_infraestrutura (Problemas asfálticos, buracos, calçadas, desabamentos, pontes, rachaduras)
+  * meio_ambiente_saneamento (Queda de árvores, podas, alagamentos, drenagem pluvial, parques públicos)
+  * atendimento_imprensa (Vazamentos de informação, críticas jornalísticas, fake news, tempo de resposta ASCOM)
+  * gestao_governanca (Greves, manifestações populares, licitações suspensas, investigações, conduta ética)
+  * seguranca_saude (Acidentes de trabalho, sinalização de segurança, interdições de vias)
 
 Gere APENAS um JSON válido com este formato EXATO:
 {
   "title": "Título do Cenário",
   "description": "Descrição detalhada do cenário (2-3 frases)",
   "difficulty": "facil|medio|dificil",
+  "category": "obras_infraestrutura|meio_ambiente_saneamento|atendimento_imprensa|gestao_governanca|seguranca_saude",
   "options": [
     {
       "id": "A",
@@ -147,6 +155,7 @@ export async function generateScenarios(
         title: string;
         description: string;
         difficulty?: string;
+        category?: string;
         options: ScenarioOption[];
       }>(raw);
 
@@ -164,6 +173,7 @@ export async function generateScenarios(
         title: parsed.title,
         description: parsed.description,
         difficulty: parsed.difficulty || difficulty || 'medio',
+        category: parsed.category || 'geral',
         source: 'ai',
         options: parsed.options.slice(0, 3).map((opt, idx) => ({
           id: String.fromCharCode(65 + idx),
@@ -306,6 +316,7 @@ export async function generateScenarioFromDocuments(docIds: number[]): Promise<S
       title: string;
       description: string;
       difficulty?: string;
+      category?: string;
       options: ScenarioOption[];
     }>(raw);
 
@@ -316,6 +327,7 @@ export async function generateScenarioFromDocuments(docIds: number[]): Promise<S
       title: parsed.title,
       description: parsed.description,
       difficulty: parsed.difficulty || 'medio',
+      category: parsed.category || 'geral',
       source: 'ai-docs',
       options: parsed.options.slice(0, 3).map((opt, idx) => ({
         id: String.fromCharCode(65 + idx),

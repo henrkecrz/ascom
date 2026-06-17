@@ -347,10 +347,10 @@ async function handleSimulatorStage(textDocs: { id: number; text: string }[], si
         description: scenario.description,
         options: scenario.options,
         difficulty: scenario.difficulty || 'medio',
-        category: docType,
+        category: scenario.category || docType,
         source: 'ai-auto',
       });
-      logger.info('Cenário gerado automaticamente pela fila', { category: docType });
+      logger.info('Cenário gerado automaticamente pela fila', { category: scenario.category || docType });
     }
   }
 
@@ -363,7 +363,7 @@ async function handleSimulatorStage(textDocs: { id: number; text: string }[], si
       description: s.description,
       options: s.options,
       difficulty: s.difficulty || 'medio',
-      category: 'geral',
+      category: s.category || 'geral',
       source: 'ai-auto',
     });
   }
