@@ -5,6 +5,7 @@ import { knowledgeQueueAgent } from './knowledgeQueueAgent';
 import { relationQueueAgent } from './relationQueueAgent';
 import { riskQueueAgent } from './riskQueueAgent';
 import { simulatorQueueAgent } from './simulatorQueueAgent';
+import { siteSyncQueueAgent } from './siteSyncQueueAgent';
 import { structureQueueAgent } from './structureQueueAgent';
 import { QueueAgentHandler, QueueAgentStage } from './types';
 
@@ -17,6 +18,7 @@ export const queueAgentRegistry: Record<QueueAgentStage, QueueAgentHandler> = {
   knowledge: knowledgeQueueAgent,
   risk: riskQueueAgent,
   simulator: simulatorQueueAgent,
+  site_sync: siteSyncQueueAgent,
 };
 
 export function getQueueAgent(stage: QueueAgentStage): QueueAgentHandler | null {
@@ -40,6 +42,7 @@ export function getQueueAgentName(stage: QueueAgentStage): string {
     knowledge: 'knowledgeQueueAgent',
     risk: 'riskQueueAgent',
     simulator: 'simulatorQueueAgent',
+    site_sync: 'siteSyncQueueAgent',
   };
   return names[stage];
 }
