@@ -12,7 +12,7 @@ type ProviderConfig = {
   id: ProviderId
   label: string
   baseUrl: string
-  defaultModel: string
+  defaultModel?: string
   requiresCredential: boolean
   modelEndpoint: string
 }
@@ -35,10 +35,10 @@ type Profile = {
 const PROFILE_ORDER: Scope[] = ['interactive_agents', 'queue_agents', 'site_agents']
 
 const FALLBACK_PROVIDERS: ProviderConfig[] = [
-  { id: 'openai', label: 'OpenAI', baseUrl: 'https://api.openai.com/v1', defaultModel: 'gpt-5.5', requiresCredential: true, modelEndpoint: '/models' },
-  { id: 'openrouter', label: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1', defaultModel: 'openai/gpt-4o-mini', requiresCredential: false, modelEndpoint: '/models' },
-  { id: 'opencode', label: 'OpenCode', baseUrl: 'https://opencode.ai/zen/v1', defaultModel: 'opencode/deepseek-v4-flash-free', requiresCredential: false, modelEndpoint: '/models' },
-  { id: 'ollama', label: 'Ollama', baseUrl: 'http://localhost:11434', defaultModel: 'llama3.2:latest', requiresCredential: false, modelEndpoint: '/api/tags' },
+  { id: 'openai', label: 'OpenAI', baseUrl: 'https://api.openai.com/v1', requiresCredential: true, modelEndpoint: '/models' },
+  { id: 'openrouter', label: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1', requiresCredential: false, modelEndpoint: '/models' },
+  { id: 'opencode', label: 'OpenCode', baseUrl: 'https://opencode.ai/zen/v1', requiresCredential: false, modelEndpoint: '/models' },
+  { id: 'ollama', label: 'Ollama', baseUrl: 'http://localhost:11434', requiresCredential: false, modelEndpoint: '/api/tags' },
 ]
 
 const PROFILE_HELP: Record<Scope, { title: string; description: string; usage: string }> = {
@@ -74,7 +74,7 @@ function defaultProfile(scope: Scope): Profile {
     hasCredential: false,
     credentialMasked: '',
     baseUrl: opencode.baseUrl,
-    model: opencode.defaultModel,
+    model: '',
     potency: defaults[scope].potency || 0.3,
     enabled: true,
     maxConcurrency: defaults[scope].maxConcurrency || 1,
@@ -96,6 +96,7 @@ export function Settings() {
   const [providers, setProviders] = useState<ProviderConfig[]>(FALLBACK_PROVIDERS)
   const [modelOptions, setModelOptions] = useState<Record<Scope, string[]>>({ interactive_agents: [], queue_agents: [], site_agents: [] })
   const [loadingModels, setLoadingModels] = useState<Record<string, boolean>>({})
+  const [modelErrors, setModelErrors] = useState<Record<string, string | undefined>>({})
   const [storeOriginals, setStoreOriginals] = useState(true)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -113,20 +114,21 @@ export function Settings() {
   const loadModelsForProfile = async (scope: Scope, profileOverride?: Profile) => {
     const profile = profileOverride || profiles[scope]
     setLoadingModels(prev => ({ ...prev, [scope]: true }))
+    setModelErrors(prev => ({ ...prev, [scope]: undefined }))
     try {
       const res = await api.post<any>('/api/settings/provider-models', {
+        scope,
         provider: profile.provider,
         baseUrl: profile.baseUrl,
         credential: profile.credential || undefined,
       })
       const models = Array.isArray(res?.models) ? res.models : []
       setModelOptions(prev => ({ ...prev, [scope]: models }))
-      if (models.length > 0 && !models.includes(profile.model)) {
-        updateProfile(scope, { model: models[0] })
-      }
-    } catch (e) {
+      if (res?.error) setModelErrors(prev => ({ ...prev, [scope]: String(res.error) }))
+    } catch (e: any) {
       console.error(e)
       setModelOptions(prev => ({ ...prev, [scope]: [] }))
+      setModelErrors(prev => ({ ...prev, [scope]: e.message || 'Erro ao carregar modelos reais do provedor.' }))
     } finally {
       setLoadingModels(prev => ({ ...prev, [scope]: false }))
     }
@@ -152,7 +154,7 @@ export function Settings() {
           ...(incoming[scope] || {}),
           provider: profileProvider,
           baseUrl: incoming[scope]?.baseUrl || providerConfig.baseUrl,
-          model: incoming[scope]?.model || providerConfig.defaultModel,
+          model: incoming[scope]?.model || '',
           credential: '',
         }
       }
@@ -178,11 +180,12 @@ export function Settings() {
       ...profiles[scope],
       provider: provider.id,
       baseUrl: provider.baseUrl,
-      model: provider.defaultModel,
+      model: '',
       credential: profiles[scope].credential || '',
     }
     setProfiles(prev => ({ ...prev, [scope]: nextProfile }))
     setModelOptions(prev => ({ ...prev, [scope]: [] }))
+    setModelErrors(prev => ({ ...prev, [scope]: undefined }))
     loadModelsForProfile(scope, nextProfile)
   }
 
@@ -280,6 +283,7 @@ export function Settings() {
           const provider = getProvider(profile.provider)
           const result = testResults[scope]
           const models = modelOptions[scope] || []
+          const modelError = modelErrors[scope]
           return (
             <div key={scope} style={{ ...cardBase, padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start' }}>
@@ -332,7 +336,7 @@ export function Settings() {
               <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: 16 }}>
                 <div>
                   <label style={smallLabel}>Modelo</label>
-                  <input list={`models-${scope}`} value={profile.model} onChange={e => updateProfile(scope, { model: e.target.value })} placeholder={provider.defaultModel} style={premiumInput} />
+                  <input list={`models-${scope}`} value={profile.model} onChange={e => updateProfile(scope, { model: e.target.value })} placeholder="Carregue modelos reais do provedor e selecione um" style={premiumInput} />
                   <datalist id={`models-${scope}`}>
                     {models.map(model => <option key={model} value={model} />)}
                   </datalist>
@@ -351,10 +355,10 @@ export function Settings() {
                 <button type="button" onClick={() => loadModelsForProfile(scope)} disabled={loadingModels[scope]} style={{
                   padding: '9px 14px', borderRadius: theme.radius.sm, border: `1px solid ${theme.colors.border}`, background: theme.colors.bgElevated, color: theme.colors.text, cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600,
                 }}>
-                  {loadingModels[scope] ? 'Carregando modelos...' : `Carregar modelos de ${provider.label}`}
+                  {loadingModels[scope] ? 'Carregando modelos...' : `Carregar modelos reais de ${provider.label}`}
                 </button>
-                <button type="button" onClick={() => testProfile(scope)} disabled={testingScope === scope} style={{
-                  padding: '9px 14px', borderRadius: theme.radius.sm, border: `1px solid ${theme.colors.border}`, background: theme.colors.bgElevated, color: theme.colors.text, cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600,
+                <button type="button" onClick={() => testProfile(scope)} disabled={testingScope === scope || !profile.model} style={{
+                  padding: '9px 14px', borderRadius: theme.radius.sm, border: `1px solid ${theme.colors.border}`, background: theme.colors.bgElevated, color: theme.colors.text, cursor: profile.model ? 'pointer' : 'not-allowed', fontSize: '0.8rem', fontWeight: 600, opacity: profile.model ? 1 : 0.6,
                 }}>
                   {testingScope === scope ? 'Testando...' : `Testar ${help.title}`}
                 </button>
@@ -362,7 +366,12 @@ export function Settings() {
 
               {models.length > 0 && (
                 <div style={{ color: theme.colors.textMuted, fontSize: '0.72rem' }}>
-                  {models.length} modelo(s) carregado(s) para {provider.label}. Digite ou selecione usando a lista do campo Modelo.
+                  {models.length} modelo(s) real(is) carregado(s) para {provider.label}. O sistema não substitui automaticamente o modelo escolhido.
+                </div>
+              )}
+              {modelError && (
+                <div style={{ color: theme.colors.danger, fontSize: '0.72rem' }}>
+                  Não foi possível carregar modelos reais: {modelError}
                 </div>
               )}
 
