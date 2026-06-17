@@ -2,7 +2,7 @@ import dotenv from 'dotenv'; dotenv.config({ override: true });
 import express from 'express';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
-import { initDatabase, getDatabase, flushDatabase, reclassifyAllScenarios } from './database';
+import { initDatabase, getDatabase, flushDatabase, reclassifyAllScenarios, ensureIntelligenceTables } from './database';
 import { startModelCache } from './services/modelCache';
 import { authMiddleware, loginHandler } from './middleware/auth';
 import { ensureQueueTable, enqueueAllFiles, enqueueGlobalStages } from './queue';
@@ -40,6 +40,9 @@ import talkingPointsRouter from './routes/talkingPoints';
 import scannerRouter from './routes/scanner';
 import agentsRouter from './routes/agents';
 import siteAgentsRouter from './routes/siteAgents';
+import documentChangesRouter from './routes/documentChanges';
+import calendarIntelligenceRouter from './routes/calendarIntelligence';
+import photoIntelligenceRouter from './routes/photoIntelligence';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -80,15 +83,18 @@ app.use(structuredDataRouter);
 app.use(knowledgeRouter);
 app.use(metricsRouter);
 app.use(photosRouter);
+app.use(photoIntelligenceRouter);
 app.use(queueRouter);
 app.use(dataSourcesRouter);
 app.use(importRouter);
 app.use(calendarRouter);
+app.use(calendarIntelligenceRouter);
 app.use(advisorRouter);
 app.use(talkingPointsRouter);
 app.use(scannerRouter);
 app.use(agentsRouter);
 app.use(siteAgentsRouter);
+app.use(documentChangesRouter);
 
 // Global error handler
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
@@ -99,6 +105,7 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 async function main() {
   await initDatabase();
   ensureQueueTable();
+  ensureIntelligenceTables();
 
   // Auto-reclassify simulator scenarios on startup
   try {
