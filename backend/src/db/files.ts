@@ -1,13 +1,12 @@
-import { getDatabase, scheduleSave, saveDatabase, DEFAULT_QUERY_LIMIT, MAX_QUERY_LIMIT } from './connection';
-import { logger } from '../lib/logger';
 import fs from 'fs';
 import path from 'path';
+import { getDatabase, scheduleSave } from './connection';
+import { logger } from '../lib/logger';
 
 export interface FileQuery {
   category?: string;
   extension?: string;
   search?: string;
-  parent_folder?: string;
   limit?: number;
   offset?: number;
 }
@@ -24,26 +23,15 @@ export interface FileResult {
   category: string;
   parent_folder: string;
   depth: number;
-  has_text?: boolean;
-  word_count?: number;
-  has_blob?: boolean;
+  has_text: boolean;
+  doc_type: string;
+  doc_type_confidence: number;
+  plan_section: string;
+  entities?: string;
 }
 
-function rowToFile(row: any): FileResult {
-  return {
-    id: Number(row.id),
-    name: String(row.name),
-    full_path: String(row.full_path),
-    relative_path: String(row.relative_path),
-    extension: row.extension !== null && row.extension !== undefined ? String(row.extension) : null,
-    size_bytes: Number(row.size_bytes),
-    size_formatted: String(row.size_formatted),
-    last_modified: String(row.last_modified),
-    category: String(row.category),
-    parent_folder: String(row.parent_folder),
-    depth: Number(row.depth),
-  };
-}
+const DEFAULT_QUERY_LIMIT = 50;
+const MAX_QUERY_LIMIT = 100;
 
 export function insertFile(file: {
   name: string;
@@ -120,198 +108,139 @@ export function getFileBlob(fileId: number): Buffer | null {
 }
 
 export function hasFileBlob(fileId: number): boolean {
-  const db = getDatabase();
-  if (!db) return false;
-  const stmt = db.prepare('SELECT 1 FROM file_blobs WHERE file_id = ?');
-  stmt.bind([fileId]);
-  const exists = stmt.step();
-  stmt.free();
-  return exists;
+  try {
+    const blobsDir = path.join(process.cwd(), 'data', 'blobs');
+    return fs.existsSync(path.join(blobsDir, `${fileId}.bin`));
+  } catch {
+    return false;
+  }
 }
 
 export function deleteFileBlob(fileId: number): void {
   const db = getDatabase();
-  if (!db) return;
-  
-  db.run('DELETE FROM file_blobs WHERE file_id = ?', [fileId]);
-  
   try {
     const blobsDir = path.join(process.cwd(), 'data', 'blobs');
     const filePath = path.join(blobsDir, `${fileId}.bin`);
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-    }
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    if (db) db.run('DELETE FROM file_blobs WHERE file_id = ?', [fileId]);
   } catch (err) {
-    logger.error(`Erro ao deletar arquivo de blob ${fileId} do disco`, err);
+    logger.error(`Erro ao apagar blob do arquivo ${fileId}`, err);
   }
-  scheduleSave();
 }
 
-export function queryFiles(query: FileQuery): { files: FileResult[]; total: number } {
+function mapFileRow(row: any): FileResult {
+  return {
+    id: Number(row.id),
+    name: String(row.name),
+    full_path: String(row.full_path),
+    relative_path: String(row.relative_path),
+    extension: row.extension ? String(row.extension) : null,
+    size_bytes: Number(row.size_bytes || 0),
+    size_formatted: String(row.size_formatted || ''),
+    last_modified: String(row.last_modified || ''),
+    category: String(row.category || ''),
+    parent_folder: String(row.parent_folder || ''),
+    depth: Number(row.depth || 0),
+    has_text: Number(row.has_text || 0) > 0,
+    doc_type: String(row.doc_type || 'outro'),
+    doc_type_confidence: Number(row.doc_type_confidence || 0),
+    plan_section: String(row.plan_section || ''),
+    entities: String(row.entities || '{}'),
+  };
+}
+
+export function queryFiles(query: FileQuery = {}): { items: FileResult[]; total: number } {
   const db = getDatabase();
-  if (!db) return { files: [], total: 0 };
+  if (!db) return { items: [], total: 0 };
 
   const conditions: string[] = [];
   const params: any[] = [];
+  if (query.category) { conditions.push('f.category = ?'); params.push(query.category); }
+  if (query.extension) { conditions.push('f.extension = ?'); params.push(query.extension); }
+  if (query.search) { conditions.push('(f.name LIKE ? OR f.relative_path LIKE ? OR f.category LIKE ?)'); params.push(`%${query.search}%`, `%${query.search}%`, `%${query.search}%`); }
+  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+  const limit = Math.min(Math.max(Number(query.limit || DEFAULT_QUERY_LIMIT), 1), MAX_QUERY_LIMIT);
+  const offset = Math.max(Number(query.offset || 0), 0);
 
-  if (query.category) {
-    conditions.push('f.category = ?');
-    params.push(query.category);
-  }
-  if (query.extension) {
-    conditions.push('f.extension = ?');
-    params.push(query.extension);
-  }
-  if (query.parent_folder) {
-    conditions.push('f.parent_folder = ?');
-    params.push(query.parent_folder);
-  }
-  if (query.search) {
-    conditions.push('(f.name LIKE ? OR f.category LIKE ? OR f.parent_folder LIKE ?)');
-    const searchTerm = `%${query.search}%`;
-    params.push(searchTerm, searchTerm, searchTerm);
-  }
-
-  const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
-
-  let countStmt = db.prepare(`SELECT COUNT(*) as total FROM files f ${whereClause}`);
-  if (params.length > 0) countStmt.bind(params);
-  countStmt.step();
-  const total = Number(countStmt.getAsObject().total);
+  const countStmt = db.prepare(`SELECT COUNT(*) as total FROM files f ${where}`);
+  countStmt.bind(params);
+  const total = countStmt.step() ? Number(countStmt.getAsObject().total || 0) : 0;
   countStmt.free();
 
-  const limit = Math.min(query.limit || DEFAULT_QUERY_LIMIT, MAX_QUERY_LIMIT);
-  const offset = query.offset || 0;
-
-  const dataParams = [...params, limit, offset];
-  const dataStmt = db.prepare(`
-    SELECT f.*,
-           CASE WHEN dt.id IS NOT NULL THEN 1 ELSE 0 END as has_text,
-           COALESCE(ds.word_count, 0) as word_count,
-           CASE WHEN fb.file_id IS NOT NULL THEN 1 ELSE 0 END as has_blob
+  const stmt = db.prepare(`
+    SELECT f.*, CASE WHEN dt.id IS NULL THEN 0 ELSE 1 END as has_text
     FROM files f
     LEFT JOIN document_text dt ON dt.file_id = f.id
-    LEFT JOIN document_summary ds ON ds.file_id = f.id
-    LEFT JOIN file_blobs fb ON fb.file_id = f.id
-    ${whereClause}
-    ORDER BY f.name ASC
+    ${where}
+    ORDER BY f.last_modified DESC
     LIMIT ? OFFSET ?
   `);
-  dataStmt.bind(dataParams);
-
-  const files: FileResult[] = [];
-  while (dataStmt.step()) {
-    const row = dataStmt.getAsObject() as any;
-    files.push({
-      ...rowToFile(row),
-      has_text: Number(row.has_text) === 1,
-      word_count: Number(row.word_count),
-      has_blob: Number(row.has_blob) === 1,
-    });
-  }
-  dataStmt.free();
-
-  return { files, total };
+  stmt.bind([...params, limit, offset]);
+  const items: FileResult[] = [];
+  while (stmt.step()) items.push(mapFileRow(stmt.getAsObject() as any));
+  stmt.free();
+  return { items, total };
 }
 
-export function getFileById(id: number): (FileResult & { raw_text?: string; summary?: string; keywords?: string; topics?: string }) | null {
+export function getFileById(id: number): FileResult | null {
   const db = getDatabase();
   if (!db) return null;
-
   const stmt = db.prepare(`
-    SELECT f.*, dt.raw_text, ds.summary, ds.keywords, ds.topics, ds.word_count,
-           CASE WHEN dt.id IS NOT NULL THEN 1 ELSE 0 END as has_text,
-           CASE WHEN fb.file_id IS NOT NULL THEN 1 ELSE 0 END as has_blob
+    SELECT f.*, CASE WHEN dt.id IS NULL THEN 0 ELSE 1 END as has_text
     FROM files f
     LEFT JOIN document_text dt ON dt.file_id = f.id
-    LEFT JOIN document_summary ds ON ds.file_id = f.id
-    LEFT JOIN file_blobs fb ON fb.file_id = f.id
     WHERE f.id = ?
   `);
   stmt.bind([id]);
-  if (!stmt.step()) {
-    stmt.free();
-    return null;
-  }
-  const row = stmt.getAsObject() as any;
+  const result = stmt.step() ? mapFileRow(stmt.getAsObject() as any) : null;
   stmt.free();
-
-  return {
-    ...rowToFile(row),
-    raw_text: row.raw_text || undefined,
-    summary: row.summary || undefined,
-    keywords: row.keywords || undefined,
-    topics: row.topics || undefined,
-    has_blob: Number(row.has_blob) === 1,
-  };
+  return result;
 }
 
 export function getCategories(): { name: string; count: number }[] {
   const db = getDatabase();
   if (!db) return [];
-  const stmt = db.prepare(`SELECT category as name, COUNT(*) as count FROM files GROUP BY category ORDER BY category`);
-  const results: { name: string; count: number }[] = [];
+  const stmt = db.prepare('SELECT category as name, COUNT(*) as count FROM files GROUP BY category ORDER BY count DESC');
+  const result: { name: string; count: number }[] = [];
   while (stmt.step()) {
     const row = stmt.getAsObject() as any;
-    results.push({ name: String(row.name), count: Number(row.count) });
+    result.push({ name: String(row.name), count: Number(row.count) });
   }
   stmt.free();
-  return results;
+  return result;
 }
 
 export function getFileTypes(): { extension: string; count: number }[] {
   const db = getDatabase();
   if (!db) return [];
-  const stmt = db.prepare(`SELECT COALESCE(extension, 'sem_extensao') as extension, COUNT(*) as count FROM files GROUP BY extension ORDER BY count DESC`);
-  const results: { extension: string; count: number }[] = [];
+  const stmt = db.prepare('SELECT extension, COUNT(*) as count FROM files GROUP BY extension ORDER BY count DESC');
+  const result: { extension: string; count: number }[] = [];
   while (stmt.step()) {
     const row = stmt.getAsObject() as any;
-    results.push({ extension: String(row.extension), count: Number(row.count) });
+    result.push({ extension: String(row.extension || 'sem extensão'), count: Number(row.count) });
   }
   stmt.free();
-  return results;
+  return result;
 }
 
 export function getAllDocuments(): FileResult[] {
-  const db = getDatabase();
-  if (!db) return [];
-  const stmt = db.prepare('SELECT * FROM files ORDER BY id');
-  const results: FileResult[] = [];
-  while (stmt.step()) {
-    results.push(rowToFile(stmt.getAsObject()));
-  }
-  stmt.free();
-  return results;
+  return queryFiles({ limit: 100 }).items;
 }
 
-export function getRelatedDocuments(fileId: number, limit: number = 10): any[] {
+export function getRelatedDocuments(fileId: number): any[] {
   const db = getDatabase();
   if (!db) return [];
   const stmt = db.prepare(`
-    SELECT r.similarity_score, r.shared_keywords,
-           f.id, f.name, f.extension, f.size_formatted, f.category
-    FROM document_relations r
-    JOIN files f ON (f.id = r.file_id_2 AND r.file_id_1 = ?) OR (f.id = r.file_id_1 AND r.file_id_2 = ?)
-    WHERE r.similarity_score > 0
-    ORDER BY r.similarity_score DESC
-    LIMIT ?
+    SELECT f.*, dr.similarity_score, dr.shared_keywords
+    FROM document_relations dr
+    JOIN files f ON f.id = CASE WHEN dr.file_id_1 = ? THEN dr.file_id_2 ELSE dr.file_id_1 END
+    WHERE dr.file_id_1 = ? OR dr.file_id_2 = ?
+    ORDER BY dr.similarity_score DESC
+    LIMIT 10
   `);
-  stmt.bind([fileId, fileId, limit]);
+  stmt.bind([fileId, fileId, fileId]);
   const results: any[] = [];
-  while (stmt.step()) {
-    const row = stmt.getAsObject() as any;
-    results.push({
-      score: Number(row.similarity_score),
-      shared_keywords: row.shared_keywords,
-      file: {
-        id: Number(row.id),
-        name: String(row.name),
-        extension: row.extension,
-        size_formatted: String(row.size_formatted),
-        category: String(row.category),
-      },
-    });
-  }
+  while (stmt.step()) results.push(stmt.getAsObject() as any);
   stmt.free();
   return results;
 }
@@ -319,21 +248,14 @@ export function getRelatedDocuments(fileId: number, limit: number = 10): any[] {
 export function getGraphData(): { nodes: any[]; edges: any[] } {
   const db = getDatabase();
   if (!db) return { nodes: [], edges: [] };
-
   const nodes: any[] = [];
   const edges: any[] = [];
   const addedFiles = new Set<number>();
 
-  const fileStmt = db.prepare('SELECT id, name, extension, category, size_formatted FROM files ORDER BY id');
+  const fileStmt = db.prepare('SELECT id, name, extension, category, size_formatted FROM files ORDER BY id LIMIT 500');
   while (fileStmt.step()) {
     const row = fileStmt.getAsObject() as any;
-    nodes.push({
-      id: Number(row.id),
-      label: String(row.name),
-      extension: row.extension,
-      category: String(row.category),
-      size: String(row.size_formatted),
-    });
+    nodes.push({ id: Number(row.id), label: String(row.name), extension: row.extension, category: String(row.category), size: String(row.size_formatted) });
     addedFiles.add(Number(row.id));
   }
   fileStmt.free();
@@ -347,12 +269,7 @@ export function getGraphData(): { nodes: any[]; edges: any[] } {
   `);
   while (relStmt.step()) {
     const row = relStmt.getAsObject() as any;
-    edges.push({
-      from: Number(row.file_id_1),
-      to: Number(row.file_id_2),
-      value: Number(row.similarity_score),
-      title: String(row.shared_keywords || ''),
-    });
+    edges.push({ from: Number(row.file_id_1), to: Number(row.file_id_2), value: Number(row.similarity_score), title: String(row.shared_keywords || '') });
   }
   relStmt.free();
 
@@ -366,13 +283,7 @@ export function getClusters(): any[] {
   const results: any[] = [];
   while (stmt.step()) {
     const row = stmt.getAsObject() as any;
-    results.push({
-      id: Number(row.id),
-      name: String(row.name),
-      description: String(row.description || ''),
-      file_ids: String(row.file_ids || ''),
-      theme_words: String(row.theme_words || ''),
-    });
+    results.push({ id: Number(row.id), name: String(row.name), description: String(row.description || ''), file_ids: String(row.file_ids || ''), theme_words: String(row.theme_words || '') });
   }
   stmt.free();
   return results;
@@ -387,6 +298,10 @@ export function deleteFile(fileId: number): void {
   db.run('DELETE FROM document_sections WHERE file_id = ?', [fileId]);
   db.run('DELETE FROM document_vectors WHERE file_id = ?', [fileId]);
   db.run('DELETE FROM classification_feedback WHERE file_id = ?', [fileId]);
+  db.run('DELETE FROM source_file_state WHERE file_id = ?', [fileId]);
+  db.run('DELETE FROM document_change_alerts WHERE change_event_id IN (SELECT id FROM document_change_events WHERE file_id = ?)', [fileId]);
+  db.run('DELETE FROM document_change_events WHERE file_id = ?', [fileId]);
+  db.run('DELETE FROM document_versions WHERE file_id = ?', [fileId]);
   db.run('DELETE FROM knowledge_relations WHERE (source_type = ? AND source_id = ?) OR (target_type = ? AND target_id = ?)', ['file', fileId, 'file', fileId]);
   db.run('DELETE FROM files WHERE id = ?', [fileId]);
   scheduleSave();
@@ -395,12 +310,17 @@ export function deleteFile(fileId: number): void {
 export function getFilesBySource(sourceId: number): Map<string, number> {
   const db = getDatabase();
   if (!db) return new Map();
-  const stmt = db.prepare('SELECT id, full_path FROM files WHERE source_id = ?');
+  const stmt = db.prepare(`
+    SELECT f.id, COALESCE(sfs.source_path, f.full_path) as source_path
+    FROM files f
+    LEFT JOIN source_file_state sfs ON sfs.file_id = f.id
+    WHERE f.source_id = ?
+  `);
   stmt.bind([sourceId]);
   const map = new Map<string, number>();
   while (stmt.step()) {
     const row = stmt.getAsObject() as any;
-    map.set(String(row.full_path), Number(row.id));
+    map.set(String(row.source_path), Number(row.id));
   }
   stmt.free();
   return map;
@@ -425,11 +345,7 @@ export function getDocumentsWithoutText(): { id: number; full_path: string; exte
   const results: any[] = [];
   while (stmt.step()) {
     const row = stmt.getAsObject() as any;
-    results.push({
-      id: Number(row.id),
-      full_path: String(row.full_path),
-      extension: row.extension,
-    });
+    results.push({ id: Number(row.id), full_path: String(row.full_path), extension: row.extension ? String(row.extension) : null });
   }
   stmt.free();
   return results;
