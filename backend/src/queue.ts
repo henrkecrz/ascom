@@ -1,7 +1,8 @@
 import { getDatabase, saveDatabase } from './database';
 import { logger } from './lib/logger';
+import { ensureQueueAgentLogTable } from './queueAgents/logs';
 
-export type QueueStage = 'extract' | 'analyze' | 'structure' | 'relations' | 'clusters' | 'knowledge' | 'simulator';
+export type QueueStage = 'extract' | 'analyze' | 'risk' | 'structure' | 'relations' | 'clusters' | 'knowledge' | 'simulator';
 export type QueueStatus = 'pending' | 'processing' | 'done' | 'error' | 'skipped' | 'dead_letter';
 
 export interface QueueItem {
@@ -37,13 +38,14 @@ export function ensureQueueTable(): void {
   )`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_pq_status ON processing_queue(status)`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_pq_file ON processing_queue(file_id)`);
+  ensureQueueAgentLogTable();
 }
 
 export function enqueueFile(fileId: number, priority: number = 0, skipSave?: boolean): void {
   const db = getDatabase();
   if (!db) return;
   const now = new Date().toISOString();
-  for (const stage of ['extract', 'analyze', 'structure'] as QueueStage[]) {
+  for (const stage of ['extract', 'analyze', 'risk', 'structure'] as QueueStage[]) {
     const existing = db.prepare('SELECT id FROM processing_queue WHERE file_id = ? AND stage = ? AND status IN (?, ?)');
     existing.bind([fileId, stage, 'pending', 'error']);
     const found = existing.step();
