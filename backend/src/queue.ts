@@ -1,8 +1,9 @@
 import { getDatabase, saveDatabase } from './database';
 import { logger } from './lib/logger';
 import { ensureQueueAgentLogTable } from './queueAgents/logs';
+import { ensureSiteSnapshotsTable } from './siteAgents/snapshots';
 
-export type QueueStage = 'extract' | 'analyze' | 'risk' | 'structure' | 'relations' | 'clusters' | 'knowledge' | 'simulator';
+export type QueueStage = 'extract' | 'analyze' | 'risk' | 'structure' | 'relations' | 'clusters' | 'knowledge' | 'simulator' | 'site_sync';
 export type QueueStatus = 'pending' | 'processing' | 'done' | 'error' | 'skipped' | 'dead_letter';
 
 export interface QueueItem {
@@ -39,6 +40,7 @@ export function ensureQueueTable(): void {
   db.run(`CREATE INDEX IF NOT EXISTS idx_pq_status ON processing_queue(status)`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_pq_file ON processing_queue(file_id)`);
   ensureQueueAgentLogTable();
+  ensureSiteSnapshotsTable();
 }
 
 export function enqueueFile(fileId: number, priority: number = 0, skipSave?: boolean): void {
@@ -73,7 +75,7 @@ export function enqueueGlobalStages(): void {
   const db = getDatabase();
   if (!db) return;
   const now = new Date().toISOString();
-  const stages = ['relations', 'clusters', 'knowledge', 'simulator'] as QueueStage[];
+  const stages = ['relations', 'clusters', 'knowledge', 'simulator', 'site_sync'] as QueueStage[];
   for (const stage of stages) {
     const existing = db.prepare('SELECT id FROM processing_queue WHERE stage = ? AND status = ?');
     existing.bind([stage, 'pending']);
