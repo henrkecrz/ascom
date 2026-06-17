@@ -7,6 +7,7 @@ import { startModelCache } from './services/modelCache';
 import { authMiddleware, loginHandler } from './middleware/auth';
 import { ensureQueueTable, enqueueAllFiles, enqueueGlobalStages } from './queue';
 import { startWorker } from './queueWorker';
+import { startSiteSyncWorker } from './siteAgents/siteSyncWorker';
 import { logger } from './lib/logger';
 import { startScannerCron, runScan } from './scanner';
 import filesRouter from './routes/files';
@@ -38,6 +39,7 @@ import advisorRouter from './routes/advisor';
 import talkingPointsRouter from './routes/talkingPoints';
 import scannerRouter from './routes/scanner';
 import agentsRouter from './routes/agents';
+import siteAgentsRouter from './routes/siteAgents';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -86,6 +88,7 @@ app.use(advisorRouter);
 app.use(talkingPointsRouter);
 app.use(scannerRouter);
 app.use(agentsRouter);
+app.use(siteAgentsRouter);
 
 // Global error handler
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
@@ -117,6 +120,7 @@ async function main() {
 
   startModelCache();
   startWorker(5000);
+  startSiteSyncWorker(10 * 60 * 1000);
 
   app.listen(Number(PORT), '0.0.0.0', () => {
     logger.info(`Servidor rodando em http://0.0.0.0:${PORT} (rede)`);
