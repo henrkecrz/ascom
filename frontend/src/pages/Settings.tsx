@@ -29,6 +29,7 @@ type Profile = {
   potency: number
   enabled: boolean
   maxConcurrency: number
+  timeoutMs: number
   fallbackUsed?: boolean
   availableModels?: string[]
   modelsUpdatedAt?: string
@@ -48,25 +49,25 @@ const PROFILE_HELP: Record<Scope, { title: string; description: string; usage: s
   interactive_agents: {
     title: 'Agentes Interativos',
     description: 'Usado para chat, consulta, crise, conteúdo, planejamento e respostas sob demanda.',
-    usage: 'Recomendado: modelo de maior qualidade, temperatura 0.4 a 0.7, concorrência 3.',
+    usage: 'Recomendado: modelo de maior qualidade, temperatura 0.4 a 0.7, concorrência 3, timeout 60s.',
   },
   queue_agents: {
     title: 'Agentes de Fila',
     description: 'Usado para classificação, estruturação de dados, simulação automática e análise em lote.',
-    usage: 'Recomendado: modelo rápido/barato, temperatura 0.1 a 0.3, concorrência 2.',
+    usage: 'Recomendado: modelo rápido/barato, temperatura 0.1 a 0.3, concorrência 2, timeout 90s.',
   },
   site_agents: {
     title: 'Site Agents',
     description: 'Usado para snapshots do painel, resumos executivos, recomendações e atualização automática das páginas.',
-    usage: 'Recomendado: modelo bom em síntese, temperatura 0.2 a 0.5, concorrência 1.',
+    usage: 'Recomendado: modelo bom em síntese, temperatura 0.2 a 0.5, concorrência 1, timeout 60s.',
   },
 }
 
 function defaultProfile(scope: Scope): Profile {
   const defaults: Record<Scope, Partial<Profile>> = {
-    interactive_agents: { potency: 0.5, maxConcurrency: 3 },
-    queue_agents: { potency: 0.2, maxConcurrency: 2 },
-    site_agents: { potency: 0.3, maxConcurrency: 1 },
+    interactive_agents: { potency: 0.5, maxConcurrency: 3, timeoutMs: 60000 },
+    queue_agents: { potency: 0.2, maxConcurrency: 2, timeoutMs: 90000 },
+    site_agents: { potency: 0.3, maxConcurrency: 1, timeoutMs: 60000 },
   }
   const opencode = FALLBACK_PROVIDERS.find(p => p.id === 'opencode')!
   return {
@@ -81,6 +82,7 @@ function defaultProfile(scope: Scope): Profile {
     potency: defaults[scope].potency || 0.3,
     enabled: true,
     maxConcurrency: defaults[scope].maxConcurrency || 1,
+    timeoutMs: defaults[scope].timeoutMs || 60000,
     availableModels: [],
     modelsUpdatedAt: '',
     modelsError: '',
@@ -171,6 +173,7 @@ export function Settings() {
           baseUrl: incoming[scope]?.baseUrl || providerConfig.baseUrl,
           model: incoming[scope]?.model || '',
           credential: '',
+          timeoutMs: Number(incoming[scope]?.timeoutMs || defaultProfile(scope).timeoutMs),
           availableModels: savedModels,
           modelsUpdatedAt: incoming[scope]?.modelsUpdatedAt || '',
           modelsError: savedError,
@@ -226,6 +229,7 @@ export function Settings() {
           potency: profile.potency,
           enabled: profile.enabled,
           maxConcurrency: profile.maxConcurrency,
+          timeoutMs: profile.timeoutMs,
           availableModels: modelOptions[scope] || profile.availableModels || [],
           modelsUpdatedAt: profile.modelsUpdatedAt || '',
           modelsError: modelErrors[scope] || profile.modelsError || '',
@@ -261,6 +265,7 @@ export function Settings() {
           potency: profile.potency,
           enabled: profile.enabled,
           maxConcurrency: profile.maxConcurrency,
+          timeoutMs: profile.timeoutMs,
         },
       })
       setTestResults(prev => ({ ...prev, [scope]: res }))
@@ -358,7 +363,7 @@ export function Settings() {
                 </p>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: 16 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: 16 }}>
                 <div>
                   <label style={smallLabel}>Modelo</label>
                   <input list={`models-${scope}`} value={profile.model} onChange={e => updateProfile(scope, { model: e.target.value })} placeholder="Carregue modelos reais do provedor e selecione um" style={premiumInput} />
@@ -373,6 +378,10 @@ export function Settings() {
                 <div>
                   <label style={smallLabel}>Concorrência</label>
                   <input type="number" min="1" max="10" value={profile.maxConcurrency} onChange={e => updateProfile(scope, { maxConcurrency: Number(e.target.value) })} style={premiumInput} />
+                </div>
+                <div>
+                  <label style={smallLabel}>Timeout (s)</label>
+                  <input type="number" min="5" max="300" value={Math.round((profile.timeoutMs || 60000) / 1000)} onChange={e => updateProfile(scope, { timeoutMs: Math.max(5, Number(e.target.value) || 60) * 1000 })} style={premiumInput} />
                 </div>
               </div>
 
