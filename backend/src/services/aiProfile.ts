@@ -21,6 +21,7 @@ export interface PublicAIProfile {
   potency: number;
   enabled: boolean;
   maxConcurrency: number;
+  timeoutMs: number;
   fallbackUsed?: boolean;
 }
 
@@ -33,6 +34,7 @@ export interface SaveAIProfileInput {
   potency?: number | string;
   enabled?: boolean;
   maxConcurrency?: number | string;
+  timeoutMs?: number | string;
 }
 
 interface ResolvedAIProfile extends PublicAIProfile {
@@ -40,10 +42,10 @@ interface ResolvedAIProfile extends PublicAIProfile {
   normalizedModel: string;
 }
 
-const DEFINITIONS: Record<Exclude<AIPipelineScope, 'default'>, { label: string; prefix: string; defaultProvider: string; potency: number; enabled: boolean; maxConcurrency: number }> = {
-  interactive_agents: { label: 'Agentes Interativos', prefix: 'ai_interactive', defaultProvider: 'opencode', potency: 0.5, enabled: true, maxConcurrency: 3 },
-  queue_agents: { label: 'Agentes de Fila', prefix: 'ai_queue', defaultProvider: 'opencode', potency: 0.2, enabled: true, maxConcurrency: 2 },
-  site_agents: { label: 'Site Agents', prefix: 'ai_site', defaultProvider: 'opencode', potency: 0.3, enabled: true, maxConcurrency: 1 },
+const DEFINITIONS: Record<Exclude<AIPipelineScope, 'default'>, { label: string; prefix: string; defaultProvider: string; potency: number; enabled: boolean; maxConcurrency: number; timeoutMs: number }> = {
+  interactive_agents: { label: 'Agentes Interativos', prefix: 'ai_interactive', defaultProvider: 'opencode', potency: 0.5, enabled: true, maxConcurrency: 3, timeoutMs: 60000 },
+  queue_agents: { label: 'Agentes de Fila', prefix: 'ai_queue', defaultProvider: 'opencode', potency: 0.2, enabled: true, maxConcurrency: 2, timeoutMs: 90000 },
+  site_agents: { label: 'Site Agents', prefix: 'ai_site', defaultProvider: 'opencode', potency: 0.3, enabled: true, maxConcurrency: 1, timeoutMs: 60000 },
 };
 
 export function maskCredential(value: string): string {
@@ -75,6 +77,12 @@ function toBool(value: string | undefined | null, fallback: boolean): boolean {
   return value === 'true' || value === '1';
 }
 
+function normalizeTimeout(value: string | number | undefined | null, fallback: number): number {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(5000, Math.min(300000, Math.round(n)));
+}
+
 function getDefaultProfile(): ResolvedAIProfile {
   const provider = normalizeProvider(getSetting('ai_provider') || 'opencode');
   const config = getProviderConfig(provider);
@@ -93,6 +101,7 @@ function getDefaultProfile(): ResolvedAIProfile {
     potency: toNumber(getSetting('ai_potency'), 0.7),
     enabled: true,
     maxConcurrency: 1,
+    timeoutMs: normalizeTimeout(getSetting('ai_timeout_ms'), 60000),
     fallbackUsed: false,
   };
 }
@@ -109,6 +118,7 @@ function toPublic(profile: ResolvedAIProfile): PublicAIProfile {
     potency: profile.potency,
     enabled: profile.enabled,
     maxConcurrency: profile.maxConcurrency,
+    timeoutMs: profile.timeoutMs,
     fallbackUsed: profile.fallbackUsed,
   };
 }
@@ -130,11 +140,11 @@ function resolveProfile(scope: AIPipelineScope): ResolvedAIProfile {
   const def = DEFINITIONS[scope];
   const prefix = def.prefix;
   const credential = getSecret(`${prefix}_api_key`);
-  const hasOwnConfig = Boolean(getSetting(`${prefix}_provider`) || getSetting(`${prefix}_base_url`) || getSetting(`${prefix}_model`) || credential);
+  const hasOwnConfig = Boolean(getSetting(`${prefix}_provider`) || getSetting(`${prefix}_base_url`) || getSetting(`${prefix}_model`) || getSetting(`${prefix}_timeout_ms`) || credential);
 
   if (!hasOwnConfig) {
     const fallback = getDefaultProfile();
-    return { ...fallback, scope, label: def.label, maxConcurrency: def.maxConcurrency, fallbackUsed: true };
+    return { ...fallback, scope, label: def.label, maxConcurrency: def.maxConcurrency, timeoutMs: def.timeoutMs, fallbackUsed: true };
   }
 
   const provider = normalizeProvider(getSetting(`${prefix}_provider`) || def.defaultProvider);
@@ -153,6 +163,7 @@ function resolveProfile(scope: AIPipelineScope): ResolvedAIProfile {
     potency: toNumber(getSetting(`${prefix}_potency`), def.potency),
     enabled: toBool(getSetting(`${prefix}_enabled`), def.enabled),
     maxConcurrency: Math.max(1, toNumber(getSetting(`${prefix}_max_concurrency`), def.maxConcurrency)),
+    timeoutMs: normalizeTimeout(getSetting(`${prefix}_timeout_ms`), def.timeoutMs),
     fallbackUsed: false,
   };
 }
@@ -169,6 +180,7 @@ export function saveAIProfiles(input: Partial<Record<Exclude<AIPipelineScope, 'd
     if (profile.potency !== undefined) setSetting(`${prefix}_potency`, String(profile.potency));
     if (profile.enabled !== undefined) setSetting(`${prefix}_enabled`, profile.enabled ? 'true' : 'false');
     if (profile.maxConcurrency !== undefined) setSetting(`${prefix}_max_concurrency`, String(Math.max(1, Number(profile.maxConcurrency) || 1)));
+    if (profile.timeoutMs !== undefined) setSetting(`${prefix}_timeout_ms`, String(normalizeTimeout(profile.timeoutMs, DEFINITIONS[scope].timeoutMs)));
     const credential = profile.credential ?? profile.apiKey;
     if (credential !== undefined && String(credential).trim().length > 0) {
       setSetting(`${prefix}_api_key`, encrypt(String(credential)));
@@ -176,11 +188,15 @@ export function saveAIProfiles(input: Partial<Record<Exclude<AIPipelineScope, 'd
   }
 }
 
+function effectiveTimeout(profile: ResolvedAIProfile, requested?: number): number {
+  return normalizeTimeout(Math.max(Number(requested || 0), Number(profile.timeoutMs || 0)), profile.timeoutMs || 60000);
+}
+
 async function callOllama(profile: ResolvedAIProfile, messages: ChatMessage[], options: { temperature?: number; maxTokens?: number; timeoutMs?: number }): Promise<string | null> {
   const baseUrl = profile.baseUrl.replace(/\/+$/, '');
   const response = await fetch(`${baseUrl}/api/chat`, {
     method: 'POST',
-    signal: AbortSignal.timeout(options.timeoutMs || 25000),
+    signal: AbortSignal.timeout(effectiveTimeout(profile, options.timeoutMs)),
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model: profile.normalizedModel,
@@ -206,7 +222,7 @@ async function callOpenAICompatible(profile: ResolvedAIProfile, messages: ChatMe
   if (profile.hasCredential) headers.Authorization = ['Bear', 'er ', profile.credential].join('');
   const response = await fetch(`${profile.baseUrl.replace(/\/+$/, '')}/chat/completions`, {
     method: 'POST',
-    signal: AbortSignal.timeout(options.timeoutMs || 25000),
+    signal: AbortSignal.timeout(effectiveTimeout(profile, options.timeoutMs)),
     headers,
     body: JSON.stringify({
       model: profile.normalizedModel,
@@ -273,6 +289,7 @@ export async function testAIProfile(scope: AIPipelineScope, override?: SaveAIPro
     potency: override?.potency !== undefined ? Number(override.potency) : resolved.potency,
     enabled: override?.enabled !== undefined ? Boolean(override.enabled) : resolved.enabled,
     maxConcurrency: override?.maxConcurrency !== undefined ? Number(override.maxConcurrency) : resolved.maxConcurrency,
+    timeoutMs: override?.timeoutMs !== undefined ? normalizeTimeout(override.timeoutMs, resolved.timeoutMs) : resolved.timeoutMs,
   };
 
   if (!profile.enabled) return { success: false, error: 'Perfil desativado', profile: toPublic(profile) };
@@ -280,8 +297,8 @@ export async function testAIProfile(scope: AIPipelineScope, override?: SaveAIPro
 
   try {
     const reply = profile.provider === 'ollama'
-      ? await callOllama(profile, [{ role: 'user', content: 'Responda apenas com a palavra OK' }], { temperature: 0.1, maxTokens: 50, timeoutMs: 15000 })
-      : await callOpenAICompatible(profile, [{ role: 'user', content: 'Responda apenas com a palavra OK' }], { temperature: 0.1, maxTokens: 50, timeoutMs: 15000 });
+      ? await callOllama(profile, [{ role: 'user', content: 'Responda apenas com a palavra OK' }], { temperature: 0.1, maxTokens: 50 })
+      : await callOpenAICompatible(profile, [{ role: 'user', content: 'Responda apenas com a palavra OK' }], { temperature: 0.1, maxTokens: 50 });
     if (!reply) return { success: false, error: 'Resposta vazia ou falha de conexão', profile: toPublic(profile) };
     return { success: true, reply: reply.trim(), profile: toPublic(profile) };
   } catch (err: any) {
