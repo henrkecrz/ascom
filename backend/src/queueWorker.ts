@@ -12,6 +12,7 @@ import { processDocxIntelligently } from './processors/docxStructureExtractor';
 import { generateScenarios, generateScenarioFromDocuments, generateTalkingPoints } from './services/simulatorAi';
 import { insertScenario, getScenarioCategories, insertTalkingPoint, getTalkingPoints } from './database';
 import { executeQueueAgentStage } from './queueAgents/queueAgentOrchestrator';
+import { runSiteAgentsSync } from './siteAgents/siteAgentOrchestrator';
 import { logger } from './lib/logger';
 
 const STAGE_TIMEOUT = 120000;
@@ -259,6 +260,11 @@ async function processStructure(doc: any, signal: AbortSignal): Promise<void> {
 }
 
 async function processGlobalStage(stage: string, signal: AbortSignal): Promise<void> {
+  if (stage === 'site_sync') {
+    await runSiteAgentsSync({ reason: 'queue' });
+    return;
+  }
+
   const db = getDatabase();
   if (!db) return;
 
