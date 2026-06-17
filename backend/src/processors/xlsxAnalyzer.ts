@@ -1,4 +1,4 @@
-import { getSetting } from '../database';
+import { callScopedLLM } from '../services/aiProfile';
 
 export type XlsxSchemaType =
   | 'contatos'
@@ -25,36 +25,12 @@ export interface XlsxSchema {
 }
 
 const SCHEMA_SIGNATURES: { type: XlsxSchemaType; patterns: RegExp[]; section: string }[] = [
-  {
-    type: 'contatos',
-    patterns: [/nome/i, /contato/i, /telefone/i, /email/i, /ve[ií]culo/i, /cargo/i, /celular/i, /whatsapp/i, /org[aã]o/i, /empresa/i, /fun[cç][aã]o/i],
-    section: 'Relacionamento com Públicos',
-  },
-  {
-    type: 'calendario',
-    patterns: [/data/i, /evento/i, /local/i, /hor[aá]rio/i, /agenda/i, /datas/i, /per[ií]odo/i, /in[ií]cio/i, /t[eé]rmino/i, /prazo/i, /mês/i],
-    section: 'Calendário de Eventos',
-  },
-  {
-    type: 'orcamento',
-    patterns: [/valor/i, /rubrica/i, /centro.?custo/i, /orçamento/i, /verba/i, /custo/i, /receita/i, /despesa/i, /previsto/i, /realizado/i, /r\$/i, /reais/i],
-    section: 'Documentos Administrativos',
-  },
-  {
-    type: 'clipping',
-    patterns: [/ve[ií]culo/i, /mat[eé]ria/i, /data/i, /t[ií]tulo/i, /manchete/i, /link/i, /url/i, /veicula[cç][aã]o/i, /alcance/i, /audiência/i],
-    section: 'Clipping e Monitoramento',
-  },
-  {
-    type: 'cronograma',
-    patterns: [/atividade/i, /respons[aá]vel/i, /in[ií]cio/i, /fim/i, /prazo/i, /etapa/i, /entrega/i, /status/i, /marco/i, /fase/i],
-    section: 'Fluxos de Trabalho',
-  },
-  {
-    type: 'indicadores',
-    patterns: [/indicador/i, /meta/i, /resultado/i, /percentual/i, /índice/i, /kpi/i, /taxa/i, /mensal/i, /acumulado/i],
-    section: 'Relatórios',
-  },
+  { type: 'contatos', patterns: [/nome/i, /contato/i, /telefone/i, /email/i, /ve[ií]culo/i, /cargo/i, /celular/i, /whatsapp/i, /org[aã]o/i, /empresa/i, /fun[cç][aã]o/i], section: 'Relacionamento com Públicos' },
+  { type: 'calendario', patterns: [/data/i, /evento/i, /local/i, /hor[aá]rio/i, /agenda/i, /datas/i, /per[ií]odo/i, /in[ií]cio/i, /t[eé]rmino/i, /prazo/i, /mês/i], section: 'Calendário de Eventos' },
+  { type: 'orcamento', patterns: [/valor/i, /rubrica/i, /centro.?custo/i, /orçamento/i, /verba/i, /custo/i, /receita/i, /despesa/i, /previsto/i, /realizado/i, /r\$/i, /reais/i], section: 'Documentos Administrativos' },
+  { type: 'clipping', patterns: [/ve[ií]culo/i, /mat[eé]ria/i, /data/i, /t[ií]tulo/i, /manchete/i, /link/i, /url/i, /veicula[cç][aã]o/i, /alcance/i, /audiência/i], section: 'Clipping e Monitoramento' },
+  { type: 'cronograma', patterns: [/atividade/i, /respons[aá]vel/i, /in[ií]cio/i, /fim/i, /prazo/i, /etapa/i, /entrega/i, /status/i, /marco/i, /fase/i], section: 'Fluxos de Trabalho' },
+  { type: 'indicadores', patterns: [/indicador/i, /meta/i, /resultado/i, /percentual/i, /índice/i, /kpi/i, /taxa/i, /mensal/i, /acumulado/i], section: 'Relatórios' },
 ];
 
 const KNOWN_HEADER_MAP: Record<string, { field: string; type: 'text' | 'date' | 'number' | 'currency' }> = {
@@ -202,34 +178,19 @@ export async function analyzeXlsxWithAI(
   sampleRows: string[][],
   sheetName: string
 ): Promise<XlsxSchema> {
-  const apiKey = getSetting('ai_api_key');
-  const baseUrl = getSetting('ai_base_url') || 'https://opencode.ai/zen/v1';
-  const model = getSetting('ai_model') || 'opencode/deepseek-v4-flash-free';
   const heuristic = analyzeXlsxHeaders(headers, sampleRows);
-  if (!apiKey || apiKey.trim().length <= 5) return { ...heuristic, sheetName };
   try {
     const prompt = AI_SCHEMA_PROMPT.replace('{headers}', JSON.stringify(headers));
-    const response = await fetch(`${baseUrl}/chat/completions`, {
-      method: 'POST',
-      signal: AbortSignal.timeout(15000),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: model.replace(/^[^/]+\//, ''),
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.1,
-        max_tokens: 500,
-      }),
+    const content = await callScopedLLM('queue_agents', [{ role: 'user', content: prompt }], {
+      temperature: 0.1,
+      maxTokens: 500,
+      timeoutMs: 15000,
     });
-    if (!response.ok) return { ...heuristic, sheetName };
-    const data = await response.json() as any;
-    const content = data.choices?.[0]?.message?.content;
     if (!content) return { ...heuristic, sheetName };
-    const jsonMatch = content.match(/\{[\s\S]*"type"[\s\S]*\}/);
-    if (!jsonMatch) return { ...heuristic, sheetName };
-    const parsed = JSON.parse(jsonMatch[0]);
+    const start = content.indexOf('{');
+    const end = content.lastIndexOf('}');
+    if (start < 0 || end <= start) return { ...heuristic, sheetName };
+    const parsed = JSON.parse(content.slice(start, end + 1));
     const aiColumns: ColumnInfo[] = (parsed.columns || []).map((c: any) => ({
       header: c.header || '',
       type: c.type || 'text',
@@ -260,5 +221,3 @@ export function getThemeFromSchema(schemaType: XlsxSchemaType): string {
   };
   return themes[schemaType] || 'geral';
 }
-
-
