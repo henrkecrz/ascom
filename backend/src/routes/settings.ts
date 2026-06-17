@@ -2,26 +2,32 @@ import { Router, Request, Response } from 'express';
 import { getSetting, setSetting } from '../database';
 import { getFreeModels } from '../services/modelCache';
 import { encrypt, decrypt } from '../lib/crypto';
+import { getAIProfiles, saveAIProfiles, testAIProfile, maskCredential, AIPipelineScope } from '../services/aiProfile';
 
 const router = Router();
 
-function maskApiKey(key: string): string {
-  if (!key || key.length < 8) return '';
-  return key.slice(0, 4) + '****' + key.slice(-4);
-}
-
 router.get('/api/settings', (_req: Request, res: Response) => {
-  const encryptedKey = getSetting('ai_api_key') || '';
-  const decryptedKey = encryptedKey ? decrypt(encryptedKey) : '';
+  const encrypted = getSetting('ai_api_key') || '';
+  let masked = '';
+  let hasKey = false;
+  if (encrypted) {
+    try {
+      const value = decrypt(encrypted);
+      masked = maskCredential(value);
+      hasKey = value.trim().length > 5;
+    } catch {}
+  }
 
   res.json({
     ai_provider: getSetting('ai_provider') || 'opencode',
-    ai_api_key: decryptedKey || '',
-    ai_api_key_masked: maskApiKey(decryptedKey),
+    ai_api_key: '',
+    ai_api_key_masked: masked,
+    ai_has_api_key: hasKey,
     ai_base_url: getSetting('ai_base_url') || 'https://opencode.ai/zen/v1',
     ai_model: getSetting('ai_model') || 'opencode/deepseek-v4-flash-free',
     ai_potency: getSetting('ai_potency') || '0.7',
     store_original_files: getSetting('store_original_files') || 'true',
+    ai_profiles: getAIProfiles(),
   });
 });
 
@@ -29,9 +35,8 @@ router.post('/api/settings', (req: Request, res: Response) => {
   const { ai_provider, ai_api_key, ai_base_url, ai_model, ai_potency, store_original_files } = req.body;
 
   if (ai_provider !== undefined) setSetting('ai_provider', String(ai_provider));
-  if (ai_api_key !== undefined) {
-    const encrypted = encrypt(String(ai_api_key));
-    setSetting('ai_api_key', encrypted);
+  if (ai_api_key !== undefined && String(ai_api_key).trim().length > 0) {
+    setSetting('ai_api_key', encrypt(String(ai_api_key)));
   }
   if (ai_base_url !== undefined) setSetting('ai_base_url', String(ai_base_url));
   if (ai_model !== undefined) setSetting('ai_model', String(ai_model));
@@ -41,52 +46,39 @@ router.post('/api/settings', (req: Request, res: Response) => {
   res.json({ success: true });
 });
 
+router.get('/api/settings/ai-profiles', (_req: Request, res: Response) => {
+  res.json({ profiles: getAIProfiles() });
+});
+
+router.post('/api/settings/ai-profiles', (req: Request, res: Response) => {
+  const profiles = req.body?.profiles || {};
+  saveAIProfiles(profiles);
+  res.json({ success: true, profiles: getAIProfiles() });
+});
+
+router.post('/api/settings/ai-profiles/test', async (req: Request, res: Response) => {
+  const scope = (req.body?.scope || 'interactive_agents') as AIPipelineScope;
+  const allowed = ['interactive_agents', 'queue_agents', 'site_agents', 'default'];
+  if (!allowed.includes(scope)) {
+    return res.status(400).json({ success: false, error: 'Escopo de IA inválido' });
+  }
+  const result = await testAIProfile(scope, req.body?.profile);
+  res.json(result);
+});
+
 router.get('/api/settings/models', async (_req: Request, res: Response) => {
   const models = getFreeModels();
-  res.json({
-    models,
-    all: models,
-    filtered: true,
-  });
+  res.json({ models, all: models, filtered: true });
 });
 
 router.post('/api/settings/test-model', async (req: Request, res: Response) => {
-  const { api_key, base_url, model } = req.body;
-  const encryptedKey = getSetting('ai_api_key');
-  const storedKey = encryptedKey ? decrypt(encryptedKey) : '';
-  const key = api_key || storedKey;
-  const url = base_url || getSetting('ai_base_url') || 'https://opencode.ai/zen/v1';
-  const mdl = (model || getSetting('ai_model') || 'opencode/deepseek-v4-flash-free').replace(/^[^/]+\//, '');
-  const isFree = !key || key.trim().length < 5;
-
-  try {
-    const cleanUrl = url.replace(/\/+$/, '');
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (!isFree) headers['Authorization'] = `Bearer ${key}`;
-
-    const response = await fetch(`${cleanUrl}/chat/completions`, {
-      method: 'POST',
-      signal: AbortSignal.timeout(15000),
-      headers,
-      body: JSON.stringify({
-        model: mdl,
-        messages: [{ role: 'user', content: 'Responda apenas com a palavra OK' }],
-        max_tokens: 50,
-        temperature: 0.1
-      })
-    });
-
-    if (!response.ok) {
-      const text = await response.text().catch(() => '');
-      return res.json({ success: false, error: `HTTP ${response.status}: ${text.slice(0, 200)}` });
-    }
-
-    const data = await response.json() as any;
-    const reply = data.choices?.[0]?.message?.content || '';
-    res.json({ success: true, reply: reply.trim() });
-  } catch (e: any) {
-    res.json({ success: false, error: e.message || 'Erro de conexão' });
-  }
+  const result = await testAIProfile('default', {
+    credential: req.body?.api_key,
+    baseUrl: req.body?.base_url,
+    model: req.body?.model,
+    potency: 0.1,
+  });
+  res.json({ success: result.success, reply: result.reply, error: result.error });
 });
 
 export default router;
