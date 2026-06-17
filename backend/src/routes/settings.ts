@@ -1,8 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { getSetting, setSetting } from '../database';
-import { getFreeModels } from '../services/modelCache';
 import { encrypt, decrypt } from '../lib/crypto';
 import { getAIProfiles, saveAIProfiles, testAIProfile, maskCredential, AIPipelineScope } from '../services/aiProfile';
+import { getProviderConfig, getProviderModels, listProviders, normalizeProvider } from '../services/modelCache';
 
 const router = Router();
 
@@ -17,24 +17,27 @@ router.get('/api/settings', (_req: Request, res: Response) => {
       hasKey = value.trim().length > 5;
     } catch {}
   }
+  const provider = normalizeProvider(getSetting('ai_provider') || 'opencode');
+  const config = getProviderConfig(provider);
 
   res.json({
-    ai_provider: getSetting('ai_provider') || 'opencode',
+    ai_provider: provider,
     ai_api_key: '',
     ai_api_key_masked: masked,
     ai_has_api_key: hasKey,
-    ai_base_url: getSetting('ai_base_url') || 'https://opencode.ai/zen/v1',
-    ai_model: getSetting('ai_model') || 'opencode/deepseek-v4-flash-free',
+    ai_base_url: getSetting('ai_base_url') || config.baseUrl,
+    ai_model: getSetting('ai_model') || config.defaultModel,
     ai_potency: getSetting('ai_potency') || '0.7',
     store_original_files: getSetting('store_original_files') || 'true',
     ai_profiles: getAIProfiles(),
+    providers: listProviders(),
   });
 });
 
 router.post('/api/settings', (req: Request, res: Response) => {
   const { ai_provider, ai_api_key, ai_base_url, ai_model, ai_potency, store_original_files } = req.body;
 
-  if (ai_provider !== undefined) setSetting('ai_provider', String(ai_provider));
+  if (ai_provider !== undefined) setSetting('ai_provider', normalizeProvider(ai_provider));
   if (ai_api_key !== undefined && String(ai_api_key).trim().length > 0) {
     setSetting('ai_api_key', encrypt(String(ai_api_key)));
   }
@@ -47,13 +50,13 @@ router.post('/api/settings', (req: Request, res: Response) => {
 });
 
 router.get('/api/settings/ai-profiles', (_req: Request, res: Response) => {
-  res.json({ profiles: getAIProfiles() });
+  res.json({ profiles: getAIProfiles(), providers: listProviders() });
 });
 
 router.post('/api/settings/ai-profiles', (req: Request, res: Response) => {
   const profiles = req.body?.profiles || {};
   saveAIProfiles(profiles);
-  res.json({ success: true, profiles: getAIProfiles() });
+  res.json({ success: true, profiles: getAIProfiles(), providers: listProviders() });
 });
 
 router.post('/api/settings/ai-profiles/test', async (req: Request, res: Response) => {
@@ -66,13 +69,29 @@ router.post('/api/settings/ai-profiles/test', async (req: Request, res: Response
   res.json(result);
 });
 
-router.get('/api/settings/models', async (_req: Request, res: Response) => {
-  const models = getFreeModels();
-  res.json({ models, all: models, filtered: true });
+router.get('/api/settings/providers', (_req: Request, res: Response) => {
+  res.json({ providers: listProviders() });
+});
+
+router.get('/api/settings/models', async (req: Request, res: Response) => {
+  const provider = normalizeProvider(String(req.query.provider || 'opencode'));
+  const baseUrl = req.query.baseUrl ? String(req.query.baseUrl) : undefined;
+  const credential = req.query.credential ? String(req.query.credential) : undefined;
+  const models = await getProviderModels(provider, baseUrl, credential);
+  res.json({ provider, models, all: models, filtered: provider === 'opencode' });
+});
+
+router.post('/api/settings/provider-models', async (req: Request, res: Response) => {
+  const provider = normalizeProvider(req.body?.provider || 'opencode');
+  const baseUrl = req.body?.baseUrl ? String(req.body.baseUrl) : undefined;
+  const credential = req.body?.credential ? String(req.body.credential) : undefined;
+  const models = await getProviderModels(provider, baseUrl, credential);
+  res.json({ provider, models, all: models, filtered: provider === 'opencode' });
 });
 
 router.post('/api/settings/test-model', async (req: Request, res: Response) => {
   const result = await testAIProfile('default', {
+    provider: req.body?.provider,
     credential: req.body?.api_key,
     baseUrl: req.body?.base_url,
     model: req.body?.model,
