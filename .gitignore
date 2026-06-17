@@ -15,3 +15,8 @@ coverage/
 .idea/
 server_out.log
 server_err.log
+backend/data/blobs/
+data/
+python_service/__pycache__/
+python_service/venv/
+frontend/tsconfig.tsbuildinfo
