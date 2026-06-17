@@ -1,8 +1,40 @@
 # Plano de Comunicação — NOVACAP / ASCOM
 
-Sistema inteligente de gerenciamento documental e consulta operacional para a **Assessoria de Comunicação (ASCOM)** da **Companhia de Urbanização da Nova Capital do Brasil (Novacap/ GDF)**.
+Sistema inteligente de gerenciamento documental, consulta operacional e **inteligência institucional** para a **Assessoria de Comunicação (ASCOM)** da **Companhia de Urbanização da Nova Capital do Brasil (Novacap/GDF)**.
 
-Transforma uma pasta de rede com documentos institucionais (PDF, DOCX, XLSX) em uma **base de conhecimento inteligente e pesquisável**, com classificação por IA, grafo de conhecimento, chat consultivo e suporte à tomada de decisão em crises.
+Em termos de mercado, o sistema funciona como uma **Plataforma de Inteligência Operacional para Comunicação Institucional**, combinando:
+
+- gestão do conhecimento;
+- gestão documental inteligente;
+- busca semântica;
+- command center de comunicação;
+- agentes de IA;
+- processamento em fila;
+- atualização automática das áreas do painel.
+
+Ele transforma uma pasta de rede com documentos institucionais — PDF, DOCX, XLSX, imagens e outros formatos — em uma **base de conhecimento pesquisável, analisável e acionável**, com classificação por IA, grafo de conhecimento, chat consultivo, simulação de crise e suporte à tomada de decisão.
+
+---
+
+## Visão Executiva
+
+O sistema não é um ERP nem um CRM.
+
+Ele não controla estoque, compras, financeiro ou clientes. A função central é organizar e interpretar o conhecimento institucional da comunicação.
+
+```txt
+Documentos e dados entram
+  ↓
+Scanner e fila processam arquivos
+  ↓
+IA/NLP classificam, resumem, extraem entidades e estruturam dados
+  ↓
+Agentes enriquecem a base, avaliam risco e atualizam o painel
+  ↓
+ASCOM consulta, decide, produz conteúdo e gerencia crise
+```
+
+A proposta final é uma central de inteligência para que a comunicação institucional tenha contexto, velocidade, rastreabilidade e apoio operacional.
 
 ---
 
@@ -10,87 +42,245 @@ Transforma uma pasta de rede com documentos institucionais (PDF, DOCX, XLSX) em 
 
 | Funcionalidade | Descrição |
 |---|---|
-| **📂 Scanner de Documentos** | Varre diretórios configurados, indexa metadados e registra estatísticas por scan |
-| **🔍 Extração Multi-formato** | PDF, DOCX, XLSX, PPTX, imagens (OCR), TXT, CSV e mais |
-| **🤖 Classificação por IA** | 12 tipos documentais com fallback baseado em regras |
-| **💬 Chat Inteligente** | Assistente com IA que responde perguntas sobre o plano |
-| **📊 Importador Universal** | Extrai PDF/DOCX/Excel/JSON/XML, detecta tipos semânticos (CPF, CNPJ) via Regex/IA, faz cache de schema e deduplica linhas com MD5 |
-| **🚨 Painel de Crise** | Protocolos, porta-vozes, checklist interativo e simulador |
-| **🕸️ Grafo de Conhecimento** | Visualização interativa de relações entre documentos |
-| **📋 Saúde do Plano** | Score de completude, gaps detecção e timeline de atualizações |
-| **📅 Calendário e Timeline** | Heatmap de atividade documental e linha do tempo |
-| **📸 Galeria de Fotos** | Organização por eventos, thumbnails e vínculo com documentos |
-| **📰 Gerador de Release** | Template engine para releases de crise e padrão |
-| **🎮 Simulador de Crise** | Cenários interativos com pontuação e feedback |
-| **🌙 Tema Claro/Escuro** | Design system completo com temas dark e light |
+| **Scanner de Documentos** | Varre diretórios configurados, indexa metadados e registra estatísticas por scan. |
+| **Extração Multi-formato** | PDF, DOCX, XLSX, PPTX, imagens com OCR, TXT, CSV, JSON, XML, HTML e outros formatos. |
+| **Classificação por IA** | Classifica documentos por tipo e seção do plano, com fallback baseado em regras. |
+| **Resumo e NLP Local** | Gera resumos, palavras-chave, tópicos e vetores TF-IDF. |
+| **Entidades e Embeddings** | Extrai pessoas, órgãos, datas, locais e valores; usa spaCy e sentence-transformers no serviço Python opcional. |
+| **Chat Consultivo** | Assistente que responde perguntas com base nos documentos e cita fontes internas. |
+| **Central de Agentes ASCOM** | Orquestrador que escolhe agentes especializados para documentos, crise, conteúdo, dados, simulação, grafo, planejamento e risco. |
+| **Agentes de Fila** | Agentes em segundo plano que registram logs de extração, análise, risco, estruturação, relações, clusters, conhecimento, simulador e site_sync. |
+| **Site Agents** | Subagentes que atualizam automaticamente snapshots das páginas essenciais, ferramentas e base de dados. |
+| **Importador Universal** | Preview, confirmação, schema inteligente, deduplicação, tabelas dinâmicas e relacionamentos. |
+| **Painel de Crise** | Protocolos, porta-vozes, checklist, prontidão, risco e matriz de fala. |
+| **Simulador de Crise** | Cenários interativos com opções, pontuação, feedback e geração automática a partir de documentos. |
+| **Grafo de Conhecimento** | Visualização interativa de relações entre documentos, entidades, clusters, contatos e dados estruturados. |
+| **Saúde do Plano** | Score de completude, lacunas, cobertura por seção e recomendações. |
+| **Calendário e Timeline** | Heatmap de atividade documental, check-ins e linha do tempo. |
+| **Galeria de Fotos** | Organização por eventos, thumbnails e vínculo com documentos. |
+| **Gerador de Release** | Geração de textos institucionais e releases a partir de templates e contexto. |
+| **Tema Claro/Escuro** | Design system com suporte a tema dark e light. |
+
+---
+
+## Arquitetura de Inteligência
+
+O sistema passou a ter três camadas de agentes.
+
+```txt
+1. Agentes Interativos
+   Respondem perguntas e apoiam decisões.
+
+2. Agentes de Fila
+   Processam documentos automaticamente, geram logs, avaliam risco e enriquecem a base.
+
+3. Site Agents
+   Atualizam snapshots inteligentes para as páginas do painel.
+```
+
+### 1. Agentes Interativos
+
+Localizados em:
+
+```txt
+backend/src/agents/
+```
+
+Principais agentes:
+
+- `documentAgent` — consulta documental;
+- `classifierAgent` — classificação de documentos;
+- `crisisAgent` — orientação de crise;
+- `spokespersonAgent` — porta-voz e falas autorizadas;
+- `contentAgent` — geração de conteúdo institucional;
+- `dataAgent` — dados e planilhas;
+- `simulatorAgent` — cenários de treinamento;
+- `graphAgent` — grafo e relações;
+- `planningAgent` — planejamento e gargalos;
+- `riskAgent` — risco institucional.
+
+Endpoint principal:
+
+```txt
+POST /api/agents/ask
+```
+
+---
+
+### 2. Agentes de Fila
+
+Localizados em:
+
+```txt
+backend/src/queueAgents/
+```
+
+Atuam sobre a fila de processamento:
+
+```txt
+extract
+analyze
+risk
+structure
+relations
+clusters
+knowledge
+simulator
+site_sync
+```
+
+Principais agentes:
+
+- `extractQueueAgent`;
+- `analyzeQueueAgent`;
+- `riskQueueAgent`;
+- `structureQueueAgent`;
+- `relationQueueAgent`;
+- `clusterQueueAgent`;
+- `knowledgeQueueAgent`;
+- `simulatorQueueAgent`;
+- `siteSyncQueueAgent`.
+
+Endpoints úteis:
+
+```txt
+GET /api/queue/agents
+GET /api/queue/agent-logs
+GET /api/queue/agent-logs?stage=site_sync
+GET /api/queue/agent-logs?riskLevel=alto
+```
+
+A tabela `queue_agent_logs` registra agente, estágio, status, confiança, risco, resumo, ação recomendada e metadados.
+
+---
+
+### 3. Site Agents
+
+Localizados em:
+
+```txt
+backend/src/siteAgents/
+```
+
+Atualizam automaticamente a camada `site_area_snapshots`, usada para alimentar páginas do painel com dados já tratados.
+
+Primeiros subagentes implementados:
+
+| Agente | Área | Página |
+|---|---|---|
+| `essentialOverviewAgent` | Essencial | Painel |
+| `essentialAlertsAgent` | Essencial | Painel |
+| `crisisReadinessAgent` | Essencial | Crise |
+| `draftPreparationAgent` | Ferramentas | Rascunhar |
+| `dataQualityAgent` | Base de Dados | Saúde / Documentos |
+| `graphEnrichmentAgent` | Base de Dados | Grafo |
+| `planCoverageAgent` | Base de Dados | Plano |
+
+Worker periódico:
+
+```txt
+backend/src/siteAgents/siteSyncWorker.ts
+```
+
+Endpoints:
+
+```txt
+GET /api/site-agents
+GET /api/site-agents/snapshots
+GET /api/site-agents/snapshots/:area
+GET /api/site-agents/snapshots/:area/:page
+POST /api/site-agents/run
+```
+
+Exemplos:
+
+```txt
+GET /api/site-agents/snapshots/essencial
+GET /api/site-agents/snapshots/ferramentas
+GET /api/site-agents/snapshots/dados
+GET /api/site-agents/snapshots/essencial/dashboard
+```
 
 ---
 
 ## Stack Tecnológica
 
 ### Backend
+
 | Tecnologia | Uso |
 |---|---|
 | Node.js + Express 4.21 | Servidor HTTP |
-| TypeScript 5.6 | Linguagem |
-| sql.js (SQLite WASM) | Banco de dados embarcado |
+| TypeScript 5.6 | Linguagem principal |
+| sql.js / SQLite WASM | Banco embarcado |
 | JWT | Autenticação |
-| natural (TF-IDF) | NLP local |
-| pdf-parse, mammoth, xlsx | Extração de texto |
-| tesseract.js | OCR |
-| sharp | Thumbnails de imagens |
+| express-rate-limit | Proteção básica contra abuso |
+| natural | TF-IDF e NLP local |
+| pdf-parse, mammoth, xlsx, word-extractor | Extração de texto e dados |
+| tesseract.js | OCR de imagens |
+| sharp | Thumbnails e processamento de imagem |
+| OpenAI-compatible chat completions | Classificação, schema, agentes, simulação e conteúdo |
 
 ### Frontend
+
 | Tecnologia | Uso |
 |---|---|
-| React 18 + Vite 6 | Framework e build |
+| React 18 + Vite 6 | SPA e build |
 | TypeScript 5.6 | Linguagem |
-| react-router-dom 7 | Roteamento SPA (HashRouter) |
+| react-router-dom 7 | Roteamento com HashRouter |
+| @tanstack/react-query 5 | Estado assíncrono |
 | vis-network + vis-data | Grafo interativo |
-| @tanstack/react-query 5 | Gerenciamento de estado assíncrono |
 | lucide-react | Ícones |
 
-### Python (serviço complementar de NLP)
+### Python opcional
+
 | Tecnologia | Uso |
 |---|---|
-| FastAPI | Servidor HTTP (porta 8000) |
-| spaCy 3.7 | NER (modelo pt_core_news_sm) |
-| sentence-transformers | Embeddings semânticos com suporte a processamento em lote (`/embeddings_batch`) |
+| FastAPI | Serviço auxiliar HTTP na porta 8000 |
+| spaCy 3.7 | NER com `pt_core_news_sm` |
+| sentence-transformers | Embeddings semânticos e processamento em lote |
 | pdfplumber | Extração avançada de PDF |
 
 ---
 
 ## Estrutura do Projeto
 
-```
+```txt
 /
 ├── backend/
 │   └── src/
-│       ├── index.ts              # Servidor Express (porta 3001) + Config Express + CORS
-│       ├── database.ts           # Camada de dados principal
-│       ├── scanner.ts            # Escaneamento de diretórios
-│       ├── analyze.ts            # Pipeline de análise completo
-│       ├── routes/               # 28 grupos de rotas (60+ endpoints)
-│       ├── analysis/             # 14 módulos de análise e IA
-│       ├── processors/           # 11 processadores de arquivos
-│       ├── db/                   # 12 módulos de banco de dados
-│       ├── middleware/           # Auth JWT + validação
-│       ├── services/             # Cache de modelo + IA do simulador
-│       ├── lib/                  # Logger + criptografia
-│       └── shared/               # Constantes + stopwords
+│       ├── index.ts                  # Servidor Express, rotas, workers e startup
+│       ├── database.ts               # Camada principal de dados
+│       ├── scanner.ts                # Scanner de diretórios
+│       ├── analyze.ts                # Pipeline de análise completo
+│       ├── queue.ts                  # Fila de processamento
+│       ├── queueWorker.ts            # Worker principal da fila
+│       ├── agents/                   # Agentes interativos e orquestrador ASCOM
+│       ├── queueAgents/              # Agentes de fila e logs por estágio
+│       ├── siteAgents/               # Site Agents, snapshots e worker periódico
+│       ├── routes/                   # Rotas da API
+│       ├── analysis/                 # NLP, IA, grafo, relações, clusters
+│       ├── processors/               # Processadores de arquivos
+│       ├── db/                       # Módulos especializados de banco
+│       ├── middleware/               # Auth JWT + validação
+│       ├── services/                 # Serviços de IA, cache, simulador
+│       ├── lib/                      # Logger + criptografia
+│       └── shared/                   # Constantes + stopwords
 ├── frontend/
 │   └── src/
-│ ├── App.tsx               # HashRouter SPA (20 lazy-loaded + LoginPage)
-│ ├── api.ts                # Cliente API centralizado
-│ ├── pages/                # 21 páginas (20 lazy-loaded + LoginPage)
-│ ├── components/           # 23 componentes compartilhados
-│       ├── theme.ts              # Design system dark/light
-│       └── ThemeContext.tsx       # Contexto de tema
+│       ├── App.tsx                   # App React
+│       ├── api.ts                    # Cliente API centralizado
+│       ├── pages/                    # Páginas do painel
+│       ├── components/               # Componentes compartilhados
+│       ├── theme.ts                  # Design system
+│       └── ThemeContext.tsx          # Contexto de tema
 ├── docs/
-│   ├── planos/                   # Planos de implantação e melhorias
-│   └── mockups/                  # Mockups das telas principais
-├── start.bat                     # Script de inicialização
-└── opencode.jsonc                # Config do provedor de IA
+│   ├── BLUEPRINT.md                  # Blueprint técnico da arquitetura
+│   ├── README.md                     # Índice de documentação
+│   ├── planos/                       # Planos de evolução e implantação
+│   └── mockups/                      # Mockups das telas principais
+├── python_service/                   # Serviço opcional de NLP/embeddings
+├── start.bat                         # Script de inicialização
+└── opencode.jsonc                    # Config do provedor de IA
 ```
 
 ---
@@ -98,53 +288,66 @@ Transforma uma pasta de rede com documentos institucionais (PDF, DOCX, XLSX) em 
 ## Instalação e Uso
 
 ### Pré-requisitos
+
 - Node.js 18+
 - npm
 
 ### Instalar dependências
+
 ```bash
 npm install
 npm run install:all
 ```
 
 ### Configurar
-Copie e edite o arquivo de configuração:
+
+Copie e edite o arquivo de ambiente:
+
 ```bash
 cp backend/.env.example backend/.env
 ```
 
 Campos obrigatórios:
-- `MASTER_PASSWORD` — senha de acesso ao sistema (sem ela o servidor não inicia)
-- `APP_SECRET` — 32 caracteres para criptografia AES-256-CBC das chaves de API
-- `JWT_SECRET` — chave para assinatura dos tokens JWT (se vazio, é auto-gerada com aviso)
 
-(Opcional) Configure o provedor de IA pela interface de Settings (http://localhost:5173/#/settings) ou pelas variáveis de ambiente. Provedor padrão: OpenCode (gratuito, modelo `opencode/deepseek-v4-flash-free`).
+- `MASTER_PASSWORD` — senha de acesso ao sistema;
+- `APP_SECRET` — 32 caracteres para criptografia AES-256-CBC das chaves de API;
+- `JWT_SECRET` — chave para assinatura dos tokens JWT.
 
-### Iniciar (desenvolvimento)
+A IA pode ser configurada pela tela de Settings ou pelas variáveis de ambiente. O padrão é OpenCode com modelo `opencode/deepseek-v4-flash-free`.
+
+### Iniciar em desenvolvimento
+
 ```bash
 npm run dev
 ```
 
-Isso inicia backend (porta 3001) e frontend (porta 5173) simultaneamente.
+Isso inicia:
 
-### Iniciar serviços separadamente
+- backend em `http://localhost:3001`;
+- frontend em `http://localhost:5173`.
+
+### Rodar serviços separadamente
+
 ```bash
-npm run dev:backend   # Backend na porta 3001
-npm run dev:frontend  # Frontend na porta 5173
+npm run dev:backend
+npm run dev:frontend
 ```
 
 ### Escanear documentos
+
 ```bash
 npm run scan
 ```
 
-### Pipeline completo (scan + análise)
+### Pipeline completo
+
 ```bash
 cd backend
 npm run full
 ```
 
-### Serviço Python (opcional — NER + embeddings avançados)
+### Serviço Python opcional
+
 ```bash
 cd python_service
 pip install -r requirements.txt
@@ -154,86 +357,128 @@ uvicorn main:app --port 8000
 
 ---
 
-## Rotas da API (60+ endpoints)
+## Workers e Processamento em Segundo Plano
 
-As rotas estão organizadas em 28 grupos:
+Ao iniciar o backend, o sistema inicializa:
 
-| Grupo | Endpoints | Descrição |
-|---|---|---|
-| `/api/files` | GET, POST | Listar, buscar e abrir arquivos |
-| `/api/dashboard` | GET | Visão geral do painel (cards, KPIs, tabelas) |
-| `/api/documents/:id` | GET | Detalhe, visualização, relacionados |
-| `/api/search` | GET, POST | Busca全文 com sugestões e busca semântica |
-| `/api/operational` | GET, POST | Painel operacional, seções, alertas |
-| `/api/consult` | GET, POST | Chat consultivo com IA (com citação de fontes) |
-| `/api/crisis` | GET | Protocolos, porta-vozes, checklist, indicadores |
-| `/api/health` | GET | Saúde do plano, gaps detectados |
-| `/api/plan` | GET | Score de completude por seção |
-| `/api/graph` | GET | Dados do grafo de conhecimento (vis-network) |
-| `/api/timeline` | GET | Timeline cronológica de documentos |
-| `/api/structured-data` | GET, DELETE | Dados estruturados importados |
-| `/api/import` | POST, GET | Importação inteligente (preview, confirmar, tabelas) |
-| `/api/settings` | GET, POST | Configurações de IA (provider, modelo, chave) |
-| `/api/contacts` | GET, POST, DELETE | Contatos de imprensa |
-| `/api/calendar` | GET, POST | Heatmap de atividade e check-in diário |
-| `/api/photos` | GET, POST | Galeria de fotos por evento |
-| `/api/data-sources` | GET, POST, DELETE, PUT | Fontes de dados escaneadas |
-| `/api/generator` | POST | Gerador de press release (template engine) |
-| `/api/simulator` | GET, POST | Simulador de crise com cenários e pontuação |
-| `/api/reports` | GET | Relatórios executivos mensais |
-| `/api/annual-report` | GET | Relatório anual consolidado |
-| `/api/queue` | GET, POST | Fila de processamento (status, retry, dead letter) |
-| `/api/metrics` | GET | Métricas e estatísticas do sistema |
-| `/api/knowledge` | GET | Grafo de conhecimento (relações multi-entidade) |
-| `/api/advisor` | GET | Workload advisor — recomendações baseadas em gaps |
-| `/api/talking-points` | GET | Matriz de talking points por categoria |
-| `/api/scanner/stats` | GET | Histórico de scans (novos, modificados, removidos por fonte) |
-| `/api/scanner/trigger` | POST | Executa scan sob demanda |
+- banco SQLite;
+- fila de processamento;
+- cache de modelos;
+- worker da fila;
+- worker periódico dos Site Agents;
+- scanner periódico.
+
+Fluxo principal:
+
+```txt
+Scanner identifica documentos
+  ↓
+processing_queue recebe estágios
+  ↓
+queueWorker executa processamento
+  ↓
+queueAgents registram logs e risco
+  ↓
+site_sync chama Site Agents
+  ↓
+site_area_snapshots atualiza o painel
+```
 
 ---
 
-## Estrutura do Banco (SQLite)
+## Rotas da API
 
-O banco fica em `backend/data/files.db` com 23 tabelas fixas:
+As rotas estão organizadas por domínio funcional.
 
-- `files` — Metadados dos arquivos indexados (18 colunas)
-- `document_text` — Texto extraído por arquivo (com FTS4 para busca全文)
-- `document_summary` — Resumo, keywords, tópicos
-- `document_vectors` — Vetores TF-IDF por termo
-- `document_relations` — Similaridades entre documentos
-- `document_clusters` — Clusters temáticos
-- `document_sections` — Seções hierárquicas de DOCX
-- `structured_data` — Dados importados de planilhas (schema_type, JSON)
-- `knowledge_relations` — Grafo de relacionamentos multi-entidade
-- `classification_feedback` — Feedback de classificação manual
-- `contacts` — Contatos de imprensa (com 3 registros iniciais)
-- `settings` — Configurações chave-valor (6 defaults: provider, API key, URL, modelo, potência, store_original)
-- `file_blobs` — Blobs originais dos arquivos (até 200 MB cada)
-- `simulator_scenarios` — Cenários do simulador de crise
-- `talking_points_matrix` — Matriz de talking points por categoria
-- `photo_events` — Eventos de fotos agrupados por mês
-- `photos` — Metadados e thumbnails de fotos
-- `photo_document_links` — Relação entre eventos de fotos e documentos
-- `data_sources` — Diretórios configurados como fonte (com índice UNIQUE em `path` p/ evitar duplicatas)
-- `scan_log` — Histórico de execuções do scanner (novos, modificados, removidos, total por fonte)
-- `calendar_checks` — Check-in diário
-- `processing_queue` — Fila de processamento (7 estágios, retry, dead letter)
-- Tabelas dinâmicas — Criadas sob demanda pelo ImportManager
+| Grupo | Descrição |
+|---|---|
+| `/api/files` | Arquivos indexados |
+| `/api/dashboard` | KPIs e cards do painel |
+| `/api/documents` | Detalhes, seções e relacionados |
+| `/api/search` | Busca textual e contextual |
+| `/api/operational` | Painel operacional, seções e alertas |
+| `/api/consult` | Chat consultivo |
+| `/api/agents` | Agentes interativos ASCOM |
+| `/api/crisis` | Protocolos, porta-vozes e checklist |
+| `/api/health` | Saúde do plano |
+| `/api/plan` | Cobertura e plano de comunicação |
+| `/api/graph` | Grafo visual |
+| `/api/knowledge-graph` | Rede de conhecimento |
+| `/api/timeline` | Timeline documental |
+| `/api/structured-data` | Dados estruturados |
+| `/api/import` | Importação inteligente |
+| `/api/settings` | Configurações de IA |
+| `/api/contacts` | Contatos e mailing |
+| `/api/calendar` | Calendário e heatmap |
+| `/api/photos` | Galeria de fotos |
+| `/api/data-sources` | Fontes de dados |
+| `/api/generator` | Gerador de releases |
+| `/api/simulator` | Simulador de crise |
+| `/api/reports` | Relatórios executivos |
+| `/api/annual-report` | Relatório anual |
+| `/api/queue` | Fila, agentes da fila e logs |
+| `/api/site-agents` | Snapshots inteligentes por página |
+| `/api/metrics` | Métricas do sistema |
+| `/api/advisor` | Recomendações de carga e gaps |
+| `/api/talking-points` | Matriz de falas autorizadas |
+| `/api/scanner` | Estatísticas e execução do scanner |
 
 ---
 
-## Planos e Documentação
+## Estrutura do Banco
 
-Na pasta `docs/planos/`:
+O banco fica em:
 
-| Documento | Descrição |
-|---|---|---|
-| `PLANO_OTIMIZACAO.md` | Plano de otimização geral em 6 fases (segurança, performance, frontend, qualidade, acessibilidade, DevOps) |
-| `PLANO_DE_MELHORIAS.md` | Guia de UI/UX completo, design system e melhorias funcionais |
-| `PLANO_IMPORTACAO_INTELIGENTE.md` | Motor de importação estilo Power BI (7 fases) |
-| `PLANO_TRANSFORMACAO_NOTA_9.md` | Transformação de segurança, arquitetura e qualidade de código |
-| `PLANO_IA_IMPORTACAO_INTELIGENTE.md` | IA para classificação semântica e importação inteligente |
-| `PLANO_USO_IA.md` | Guia de uso dos provedores de IA (OpenCode/OpenAI) |
+```txt
+backend/data/files.db
+```
+
+Principais tabelas:
+
+- `files` — metadados dos arquivos;
+- `document_text` — texto extraído e FTS;
+- `document_summary` — resumo, keywords, tópicos;
+- `document_vectors` — vetores TF-IDF;
+- `document_embeddings` — embeddings semânticos;
+- `document_relations` — similaridades;
+- `document_clusters` — clusters;
+- `document_sections` — seções hierárquicas;
+- `structured_data` — dados estruturados;
+- `knowledge_relations` — grafo de conhecimento;
+- `classification_feedback` — feedback manual;
+- `contacts` — contatos de imprensa;
+- `settings` — configurações;
+- `file_blobs` — blobs originais;
+- `simulator_scenarios` — cenários de crise;
+- `talking_points_matrix` — matriz de fala;
+- `photo_events` e `photos` — galeria;
+- `photo_document_links` — vínculo foto/documento;
+- `data_sources` — fontes de dados;
+- `scan_log` — histórico do scanner;
+- `calendar_checks` — check-ins de calendário;
+- `processing_queue` — fila de processamento;
+- `queue_agent_logs` — logs dos agentes de fila;
+- `site_area_snapshots` — snapshots inteligentes das páginas;
+- tabelas dinâmicas criadas pelo importador.
+
+---
+
+## Documentação
+
+A documentação está em:
+
+```txt
+docs/
+```
+
+Principais arquivos:
+
+- `docs/README.md` — índice da documentação;
+- `docs/BLUEPRINT.md` — blueprint técnico da arquitetura;
+- `docs/planos/PLANO_AGENTES_ASCOM.md` — agentes interativos;
+- `docs/planos/PLANO_AGENTES_FILA_ASCOM.md` — agentes de fila;
+- `docs/planos/PLANO_AGENTES_SITE_ASCOM.md` — Site Agents;
+- `docs/planos/PLANO_WORKERS_SITE_AGENTS_ASCOM.md` — workers dos Site Agents.
 
 ---
 
