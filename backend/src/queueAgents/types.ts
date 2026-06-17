@@ -6,7 +6,8 @@ export type QueueAgentStage =
   | 'clusters'
   | 'knowledge'
   | 'risk'
-  | 'simulator';
+  | 'simulator'
+  | 'site_sync';
 
 export type QueueAgentStatus = 'done' | 'skipped' | 'error';
 export type QueueRiskLevel = 'baixo' | 'medio' | 'alto' | 'critico';
