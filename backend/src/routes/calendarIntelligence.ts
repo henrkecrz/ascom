@@ -95,7 +95,7 @@ router.put('/api/calendar/opportunities/:id/status', (req: Request, res: Respons
 });
 
 router.get('/api/calendar/day/:date', (req: Request, res: Response) => {
-  res.json(getDayIntelligence(req.params.date));
+  res.json(getDayIntelligence(String(req.params.date)));
 });
 
 router.get('/api/calendar/month/:year/:month', (req: Request, res: Response) => {

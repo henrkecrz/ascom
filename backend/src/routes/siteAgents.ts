@@ -40,7 +40,7 @@ router.get('/api/site-agents/snapshots/:area/:page', (req: Request, res: Respons
   res.json({
     area: req.params.area,
     page: req.params.page,
-    snapshots: listSiteSnapshots({ area: req.params.area as SiteArea, page: req.params.page }),
+    snapshots: listSiteSnapshots({ area: req.params.area as SiteArea, page: String(req.params.page) }),
   });
 });
 

@@ -48,7 +48,7 @@ router.post('/api/photos/:id/tags', (req: Request, res: Response) => {
 router.delete('/api/photos/:id/tags/:tag', (req: Request, res: Response) => {
   const photoId = Number(req.params.id);
   if (!Number.isFinite(photoId)) return res.status(400).json({ error: 'ID inválido' });
-  deletePhotoTag(photoId, req.params.tag);
+  deletePhotoTag(photoId, String(req.params.tag));
   res.json({ success: true });
 });
 

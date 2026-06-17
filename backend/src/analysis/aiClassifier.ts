@@ -78,7 +78,7 @@ export async function classifyWithAI(
     const content = await callScopedLLM('queue_agents', [
       { role: 'system', content: SYSTEM_PROMPT },
       { role: 'user', content: `Nome do arquivo: ${name}\nCategoria: ${category}\n\nConteúdo do documento:\n${corpus}` },
-    ], { temperature: 0.1, maxTokens: 150, timeoutMs: 15000 });
+    ], { temperature: 0.1, maxTokens: 1000, timeoutMs: 15000 });
 
     if (!content) return fallback();
 

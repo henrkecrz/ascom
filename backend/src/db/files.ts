@@ -7,6 +7,7 @@ export interface FileQuery {
   category?: string;
   extension?: string;
   search?: string;
+  parent_folder?: string;
   limit?: number;
   offset?: number;
 }
@@ -158,6 +159,7 @@ export function queryFiles(query: FileQuery = {}): { items: FileResult[]; total:
   if (query.category) { conditions.push('f.category = ?'); params.push(query.category); }
   if (query.extension) { conditions.push('f.extension = ?'); params.push(query.extension); }
   if (query.search) { conditions.push('(f.name LIKE ? OR f.relative_path LIKE ? OR f.category LIKE ?)'); params.push(`%${query.search}%`, `%${query.search}%`, `%${query.search}%`); }
+  if (query.parent_folder) { conditions.push('f.parent_folder = ?'); params.push(query.parent_folder); }
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
   const limit = Math.min(Math.max(Number(query.limit || DEFAULT_QUERY_LIMIT), 1), MAX_QUERY_LIMIT);
   const offset = Math.max(Number(query.offset || 0), 0);

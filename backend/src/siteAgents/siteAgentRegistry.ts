@@ -9,6 +9,7 @@ import { galleryContextAgent } from './galleryContextAgent';
 import { graphEnrichmentAgent } from './graphEnrichmentAgent';
 import { planCoverageAgent } from './planCoverageAgent';
 import { sourceSyncAgent } from './sourceSyncAgent';
+import { logReviewAgent } from './logReviewAgent';
 import { SiteAgentDefinition } from './types';
 
 export const siteAgentRegistry: SiteAgentDefinition[] = [
@@ -88,6 +89,13 @@ export const siteAgentRegistry: SiteAgentDefinition[] = [
     area: 'dados',
     pages: ['galeria'],
     handler: galleryContextAgent,
+  },
+  {
+    id: 'logReviewAgent',
+    label: 'Revisor de logs e fila',
+    area: 'dados',
+    pages: ['dashboard', 'health'],
+    handler: logReviewAgent,
   },
 ];
 

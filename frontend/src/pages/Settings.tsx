@@ -17,6 +17,15 @@ type ProviderConfig = {
   modelEndpoint: string
 }
 
+type ModelDetail = {
+  id: string
+  name: string
+  contextLength: number
+  maxOutput: number
+  isReasoning: boolean
+  isFree: boolean
+}
+
 type Profile = {
   scope: Scope
   label: string
@@ -32,6 +41,7 @@ type Profile = {
   timeoutMs: number
   fallbackUsed?: boolean
   availableModels?: string[]
+  availableModelsDetails?: ModelDetail[]
   modelsUpdatedAt?: string
   modelsError?: string
 }
@@ -131,17 +141,18 @@ export function Settings() {
         credential: profile.credential || undefined,
       })
       const models = Array.isArray(res?.models) ? res.models : []
+      const details = Array.isArray(res?.details) ? res.details : []
       const error = res?.error ? String(res.error) : ''
       const updatedAt = new Date().toISOString()
       setModelOptions(prev => ({ ...prev, [scope]: models }))
       setModelErrors(prev => ({ ...prev, [scope]: error || undefined }))
-      setProfiles(prev => ({ ...prev, [scope]: { ...prev[scope], availableModels: models, modelsUpdatedAt: updatedAt, modelsError: error } }))
+      setProfiles(prev => ({ ...prev, [scope]: { ...prev[scope], availableModels: models, availableModelsDetails: details, modelsUpdatedAt: updatedAt, modelsError: error } }))
     } catch (e: any) {
       const error = e.message || 'Erro ao carregar modelos reais do provedor.'
       console.error(e)
       setModelOptions(prev => ({ ...prev, [scope]: [] }))
       setModelErrors(prev => ({ ...prev, [scope]: error }))
-      setProfiles(prev => ({ ...prev, [scope]: { ...prev[scope], availableModels: [], modelsUpdatedAt: new Date().toISOString(), modelsError: error } }))
+      setProfiles(prev => ({ ...prev, [scope]: { ...prev[scope], availableModels: [], availableModelsDetails: [], modelsUpdatedAt: new Date().toISOString(), modelsError: error } }))
     } finally {
       setLoadingModels(prev => ({ ...prev, [scope]: false }))
     }
@@ -165,6 +176,7 @@ export function Settings() {
         const profileProvider = incoming[scope]?.provider || 'opencode'
         const providerConfig = providerList.find((p: ProviderConfig) => p.id === profileProvider) || FALLBACK_PROVIDERS.find(p => p.id === profileProvider) || FALLBACK_PROVIDERS[2]
         const savedModels = Array.isArray(incoming[scope]?.availableModels) ? incoming[scope].availableModels : []
+        const savedDetails = Array.isArray(incoming[scope]?.availableModelsDetails) ? incoming[scope].availableModelsDetails : []
         const savedError = incoming[scope]?.modelsError || ''
         next[scope] = {
           ...defaultProfile(scope),
@@ -175,6 +187,7 @@ export function Settings() {
           credential: '',
           timeoutMs: Number(incoming[scope]?.timeoutMs || defaultProfile(scope).timeoutMs),
           availableModels: savedModels,
+          availableModelsDetails: savedDetails,
           modelsUpdatedAt: incoming[scope]?.modelsUpdatedAt || '',
           modelsError: savedError,
         }
@@ -194,6 +207,23 @@ export function Settings() {
 
   const updateProfile = (scope: Scope, patch: Partial<Profile>) => {
     setProfiles(prev => ({ ...prev, [scope]: { ...prev[scope], ...patch } }))
+  }
+
+  const handleModelChange = (scope: Scope, modelVal: string) => {
+    const profile = profiles[scope]
+    const details = profile.availableModelsDetails?.find((d: any) => d.id === modelVal)
+    const patch: Partial<Profile> = { model: modelVal }
+    
+    if (details) {
+      if (details.isFree) {
+        patch.maxConcurrency = 1
+      }
+      if (details.isReasoning) {
+        patch.timeoutMs = Math.max(profile.timeoutMs, 90000)
+      }
+    }
+    
+    updateProfile(scope, patch)
   }
 
   const applyProvider = (scope: Scope, providerId: string) => {
@@ -366,10 +396,31 @@ export function Settings() {
               <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: 16 }}>
                 <div>
                   <label style={smallLabel}>Modelo</label>
-                  <input list={`models-${scope}`} value={profile.model} onChange={e => updateProfile(scope, { model: e.target.value })} placeholder="Carregue modelos reais do provedor e selecione um" style={premiumInput} />
+                  <input list={`models-${scope}`} value={profile.model} onChange={e => handleModelChange(scope, e.target.value)} placeholder="Carregue modelos reais do provedor e selecione um" style={premiumInput} />
                   <datalist id={`models-${scope}`}>
                     {models.map(model => <option key={model} value={model} />)}
                   </datalist>
+                  {(() => {
+                    const details = profile.availableModelsDetails?.find((d: any) => d.id === profile.model);
+                    if (!details) return null;
+                    return (
+                      <div style={{ marginTop: 6, display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: '0.72rem' }}>
+                        <span style={{ color: theme.colors.accentLight }}>
+                          Janela: <strong>{details.contextLength >= 1000000 ? `${details.contextLength / 1000000}M` : `${details.contextLength / 1000}k`}</strong>
+                        </span>
+                        {details.isReasoning && (
+                          <span style={{ color: theme.colors.warning, display: 'flex', alignItems: 'center', gap: 2 }}>
+                            🧠 Raciocínio (Pensamento lento)
+                          </span>
+                        )}
+                        {details.isFree && (
+                          <span style={{ color: theme.colors.success, display: 'flex', alignItems: 'center', gap: 2 }}>
+                            🟢 Gratuito (Concorrência=1 auto)
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
                 <div>
                   <label style={smallLabel}>Temperatura ({Number(profile.potency).toFixed(1)})</label>

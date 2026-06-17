@@ -1,5 +1,4 @@
 import { useState, useCallback, useEffect } from 'react'
-import { useTheme } from '../ThemeContext'
 import { Shield, CheckCircle2, Users, AlertTriangle } from 'lucide-react'
 import { CrisisProtocols } from '../components/CrisisProtocols'
 import { CrisisSpokespersons } from '../components/CrisisSpokespersons'
@@ -17,10 +16,7 @@ interface ActiveCrisis {
   keywords?: string
 }
 
-const crisisColor = 'oklch(58% 0.19 30)'
-
 export function CrisisPanel({ onSelectDoc }: Props) {
-  const { theme } = useTheme()
   const { data: protocolsData } = useProtocols()
   const { data: spokespersonsData } = useSpokespersons()
   const { data: checklistData } = useChecklist()

@@ -1,7 +1,7 @@
 import { getSetting, setSetting } from '../database';
 import { decrypt, encrypt } from '../lib/crypto';
 import { logger } from '../lib/logger';
-import { getProviderConfig, normalizeProvider } from './modelCache';
+import { getProviderConfig, normalizeProvider, getModelMetadata } from './modelCache';
 
 export type AIPipelineScope = 'interactive_agents' | 'queue_agents' | 'site_agents' | 'default';
 
@@ -78,8 +78,9 @@ function toBool(value: string | undefined | null, fallback: boolean): boolean {
 }
 
 function normalizeTimeout(value: string | number | undefined | null, fallback: number): number {
+  if (value === undefined || value === null || value === '' || String(value).trim() === '') return fallback;
   const n = Number(value);
-  if (!Number.isFinite(n)) return fallback;
+  if (!Number.isFinite(n) || n <= 0) return fallback;
   return Math.max(5000, Math.min(300000, Math.round(n)));
 }
 
@@ -88,6 +89,18 @@ function getDefaultProfile(): ResolvedAIProfile {
   const config = getProviderConfig(provider);
   const credential = getSecret('ai_api_key');
   const model = getSetting('ai_model') || '';
+  const metadata = getModelMetadata(model, provider);
+  
+  let maxConcurrency = 1;
+  if (metadata.isFree) {
+    maxConcurrency = 1;
+  }
+  
+  let timeoutMs = normalizeTimeout(getSetting('ai_timeout_ms'), 60000);
+  if (metadata.isReasoning) {
+    timeoutMs = Math.max(timeoutMs, 90000);
+  }
+
   return {
     scope: 'default',
     label: 'Configuração Global',
@@ -100,8 +113,8 @@ function getDefaultProfile(): ResolvedAIProfile {
     normalizedModel: normalizeModel(provider, model),
     potency: toNumber(getSetting('ai_potency'), 0.7),
     enabled: true,
-    maxConcurrency: 1,
-    timeoutMs: normalizeTimeout(getSetting('ai_timeout_ms'), 60000),
+    maxConcurrency,
+    timeoutMs,
     fallbackUsed: false,
   };
 }
@@ -150,6 +163,18 @@ function resolveProfile(scope: AIPipelineScope): ResolvedAIProfile {
   const provider = normalizeProvider(getSetting(`${prefix}_provider`) || def.defaultProvider);
   const config = getProviderConfig(provider);
   const model = getSetting(`${prefix}_model`) || '';
+  const metadata = getModelMetadata(model, provider);
+
+  let maxConcurrency = Math.max(1, toNumber(getSetting(`${prefix}_max_concurrency`), def.maxConcurrency));
+  if (metadata.isFree) {
+    maxConcurrency = 1; // Clampa concorrência para 1 em modelos gratuitos para evitar rate limits
+  }
+
+  let timeoutMs = normalizeTimeout(getSetting(`${prefix}_timeout_ms`), def.timeoutMs);
+  if (metadata.isReasoning) {
+    timeoutMs = Math.max(timeoutMs, 90000); // Garante timeout mínimo de 90s para modelos de raciocínio
+  }
+
   return {
     scope,
     label: def.label,
@@ -162,8 +187,8 @@ function resolveProfile(scope: AIPipelineScope): ResolvedAIProfile {
     normalizedModel: normalizeModel(provider, model),
     potency: toNumber(getSetting(`${prefix}_potency`), def.potency),
     enabled: toBool(getSetting(`${prefix}_enabled`), def.enabled),
-    maxConcurrency: Math.max(1, toNumber(getSetting(`${prefix}_max_concurrency`), def.maxConcurrency)),
-    timeoutMs: normalizeTimeout(getSetting(`${prefix}_timeout_ms`), def.timeoutMs),
+    maxConcurrency,
+    timeoutMs,
     fallbackUsed: false,
   };
 }
@@ -183,7 +208,9 @@ export function saveAIProfiles(input: Partial<Record<Exclude<AIPipelineScope, 'd
     if (profile.timeoutMs !== undefined) setSetting(`${prefix}_timeout_ms`, String(normalizeTimeout(profile.timeoutMs, DEFINITIONS[scope].timeoutMs)));
     const credential = profile.credential ?? profile.apiKey;
     if (credential !== undefined && String(credential).trim().length > 0) {
-      setSetting(`${prefix}_api_key`, encrypt(String(credential)));
+      if (!String(credential).includes('****')) {
+        setSetting(`${prefix}_api_key`, encrypt(String(credential)));
+      }
     }
   }
 }
@@ -251,6 +278,18 @@ export async function callScopedLLM(
     logger.warn('Perfil de IA sem modelo selecionado', { scope, provider: profile.provider });
     return null;
   }
+
+  // Ajustes inteligentes para modelos de raciocínio (ex: DeepSeek R1/V4)
+  const metadata = getModelMetadata(profile.model, profile.provider);
+  if (metadata.isReasoning) {
+    if (options.maxTokens === undefined || options.maxTokens < 1000) {
+      options.maxTokens = 1000; // Mínimo de 1000 tokens para acomodar o raciocínio inicial
+    }
+    if (options.timeoutMs === undefined || options.timeoutMs < 60000) {
+      options.timeoutMs = 60000; // Mínimo de 60s para o processo de pensamento
+    }
+  }
+
   const startedAt = Date.now();
   try {
     const content = profile.provider === 'ollama'

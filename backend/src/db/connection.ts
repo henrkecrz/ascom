@@ -84,18 +84,56 @@ export async function initDatabase(): Promise<void> {
     status TEXT DEFAULT 'pending'
   )`);
 
-  db.run(`CREATE VIRTUAL TABLE IF NOT EXISTS document_text_fts USING fts4(raw_text, content='document_text')`);
+  // Migrate document_text_fts to standard FTS4 table if needed (to avoid Wasm sql.js FTS4 external content UPDATE/DELETE SQL logic error)
+  let needsFtsMigration = false;
+  try {
+    const stmt = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='document_text_fts'");
+    if (stmt.step()) {
+      const sqlText = stmt.getAsObject().sql || '';
+      if (sqlText.includes("content=")) {
+        needsFtsMigration = true;
+      }
+    }
+    stmt.free();
+  } catch (e) {
+    // ignore
+  }
 
-  db.run(`CREATE TRIGGER IF NOT EXISTS dt_ai AFTER INSERT ON document_text BEGIN
+  if (needsFtsMigration) {
+    try {
+      db.run("DROP TRIGGER IF EXISTS dt_ai");
+      db.run("DROP TRIGGER IF EXISTS dt_ad");
+      db.run("DROP TRIGGER IF EXISTS dt_au");
+      db.run("DROP TABLE IF EXISTS document_text_fts");
+    } catch (e) {
+      console.error("Erro ao limpar FTS antigo:", e);
+    }
+  }
+
+  db.run(`CREATE VIRTUAL TABLE IF NOT EXISTS document_text_fts USING fts4(raw_text)`);
+
+  if (needsFtsMigration) {
+    try {
+      db.run(`INSERT INTO document_text_fts(docid, raw_text) SELECT id, raw_text FROM document_text`);
+    } catch (e) {
+      console.error("Erro ao repopular FTS:", e);
+    }
+  }
+
+  db.run(`DROP TRIGGER IF EXISTS dt_ai`);
+  db.run(`DROP TRIGGER IF EXISTS dt_ad`);
+  db.run(`DROP TRIGGER IF EXISTS dt_au`);
+
+  db.run(`CREATE TRIGGER dt_ai AFTER INSERT ON document_text BEGIN
     INSERT INTO document_text_fts(docid, raw_text) VALUES (new.id, new.raw_text);
   END`);
 
-  db.run(`CREATE TRIGGER IF NOT EXISTS dt_ad AFTER DELETE ON document_text BEGIN
-    INSERT INTO document_text_fts(document_text_fts, docid, raw_text) VALUES('delete', old.id, old.raw_text);
+  db.run(`CREATE TRIGGER dt_ad AFTER DELETE ON document_text BEGIN
+    DELETE FROM document_text_fts WHERE docid = old.id;
   END`);
 
-  db.run(`CREATE TRIGGER IF NOT EXISTS dt_au AFTER UPDATE ON document_text BEGIN
-    INSERT INTO document_text_fts(document_text_fts, docid, raw_text) VALUES('delete', old.id, old.raw_text);
+  db.run(`CREATE TRIGGER dt_au AFTER UPDATE ON document_text BEGIN
+    DELETE FROM document_text_fts WHERE docid = old.id;
     INSERT INTO document_text_fts(docid, raw_text) VALUES (new.id, new.raw_text);
   END`);
 
@@ -153,7 +191,8 @@ export async function initDatabase(): Promise<void> {
   addColumnIfMissing('files', 'md5_hash', "TEXT DEFAULT ''");
   addColumnIfMissing('files', 'source_id', 'INTEGER DEFAULT 0');
   addColumnIfMissing('files', 'scanned_count', 'INTEGER DEFAULT 0');
-  addColumnIfMissing('structured_data', 'row_hash', 'TEXT UNIQUE');
+  addColumnIfMissing('structured_data', 'row_hash', 'TEXT');
+  try { db.run('CREATE UNIQUE INDEX IF NOT EXISTS idx_structured_data_row_hash ON structured_data (row_hash)'); } catch (e) {}
 
   db.run(`CREATE TABLE IF NOT EXISTS scan_log (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -423,6 +462,11 @@ export async function initDatabase(): Promise<void> {
   db.run(`CREATE INDEX IF NOT EXISTS idx_files_source_id ON files(source_id)`);
   // Unique constraint via index (sql.js não suporta CREATE UNIQUE INDEX com IF NOT EXISTS)
   try { db.run(`CREATE UNIQUE INDEX IF NOT EXISTS idx_ds_path_unique ON data_sources(path)`); } catch {}
+
+  // Limpa configurações de timeout corrompidas de 5000ms para usar os valores padrão reais
+  try {
+    db.run("DELETE FROM settings WHERE key IN ('ai_interactive_timeout_ms', 'ai_queue_timeout_ms', 'ai_site_timeout_ms') AND value = '5000'");
+  } catch (e) {}
 
   flushDatabase();
 }

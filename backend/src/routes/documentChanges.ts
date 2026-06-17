@@ -16,7 +16,7 @@ import {
 
 const router = Router();
 
-function intParam(value: string | undefined): number | null {
+function intParam(value: any): number | null {
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
 }

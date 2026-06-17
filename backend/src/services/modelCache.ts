@@ -164,3 +164,77 @@ export function startModelCache(): void {
   if (refreshTimer) clearInterval(refreshTimer);
   refreshTimer = setInterval(refreshCache, REFRESH_INTERVAL_MS);
 }
+
+export interface ModelDetail {
+  id: string;
+  name: string;
+  contextLength: number;
+  maxOutput: number;
+  isReasoning: boolean;
+  isFree: boolean;
+}
+
+export function getModelMetadata(modelId: string, providerInput: string, raw?: any): ModelDetail {
+  const id = String(modelId || '').trim();
+  const nameLower = id.toLowerCase();
+  const provider = normalizeProvider(providerInput);
+  
+  // Heuristic for isFree
+  const isFree = nameLower.includes('free') || 
+                 nameLower.includes(':free') || 
+                 (raw && (raw.is_free || String(raw.name).toLowerCase().includes('free')));
+  
+  // Heuristic for isReasoning
+  const isReasoning = nameLower.includes('r1') ||
+                      nameLower.includes('v4-flash') ||
+                      nameLower.includes('thinking') ||
+                      nameLower.includes('reasoning') ||
+                      nameLower.includes('o1-') ||
+                      nameLower.includes('o3-') ||
+                      nameLower.includes('nemotron-3-nano-omni');
+                      
+  // Heuristic for contextLength
+  let contextLength = 128000;
+  if (raw && Number(raw.context_length)) {
+    contextLength = Number(raw.context_length);
+  } else {
+    if (nameLower.includes('gemini')) contextLength = 1048576; // 1M
+    else if (nameLower.includes('claude')) contextLength = 200000;
+    else if (nameLower.includes('gpt-4')) contextLength = 128000;
+    else if (nameLower.includes('gpt-3.5')) contextLength = 16385;
+    else if (nameLower.includes('llama-3')) contextLength = 128000;
+    else if (nameLower.includes('deepseek')) contextLength = 64000;
+    else if (nameLower.includes('mimo') || nameLower.includes('qwen') || nameLower.includes('north')) contextLength = 32000;
+  }
+  
+  // Heuristic for maxOutput
+  let maxOutput = 4096;
+  if (raw && Number(raw.top_provider?.max_completion_tokens)) {
+    maxOutput = Number(raw.top_provider.max_completion_tokens);
+  } else {
+    if (isReasoning) maxOutput = 8192;
+    else if (nameLower.includes('gemini')) maxOutput = 8192;
+    else if (nameLower.includes('claude')) maxOutput = 4096;
+  }
+  
+  // Human readable label
+  let name = id;
+  if (raw && raw.name) {
+    name = raw.name;
+  } else {
+    const parts = id.split('/');
+    const mainName = parts[parts.length - 1];
+    name = mainName
+      .replace(/-/g, ' ')
+      .replace(/\b[a-z]/g, (char) => char.toUpperCase());
+  }
+
+  return {
+    id,
+    name,
+    contextLength,
+    maxOutput,
+    isReasoning,
+    isFree
+  };
+}

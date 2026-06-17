@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useTheme } from '../ThemeContext'
-import { AlertTriangle, Clock, FileText, CheckCircle2, Copy, Download, Radio, ShieldAlert } from 'lucide-react'
+import { Clock, FileText, CheckCircle2, Copy, Download, ShieldAlert } from 'lucide-react'
 import { api } from '../api'
 import { ConsultChat } from '../pages/ConsultChat'
 
@@ -19,7 +18,6 @@ interface CrisisActiveWorkspaceProps {
 }
 
 export function CrisisActiveWorkspace({ protocolId, protocolName, protocolSummary, keywords, startTime, checklist, checkedSteps, onToggleStep, spokespersons, onEndCrisis, onSelectDoc }: CrisisActiveWorkspaceProps) {
-  const { theme } = useTheme()
   const crisisColor = '#ff2a2a'
 
   const [elapsed, setElapsed] = useState<string>('00:00:00')

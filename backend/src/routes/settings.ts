@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { getSetting, setSetting } from '../database';
 import { encrypt, decrypt } from '../lib/crypto';
 import { getAIProfiles, saveAIProfiles, testAIProfile, maskCredential, AIPipelineScope } from '../services/aiProfile';
-import { getProviderConfig, listProviders, normalizeProvider, AIProvider } from '../services/modelCache';
+import { getProviderConfig, listProviders, normalizeProvider, AIProvider, getModelMetadata, ModelDetail } from '../services/modelCache';
 
 const router = Router();
 
@@ -89,7 +89,9 @@ function sanitizeProfilesForSettings(): any {
   for (const [scope, prefix] of Object.entries(SCOPE_PREFIX)) {
     if (!profiles[scope]) continue;
     if (!getSetting(`${prefix}_model`)) profiles[scope].model = '';
-    profiles[scope].availableModels = parseSavedModels(getSetting(`${prefix}_available_models`));
+    const models = parseSavedModels(getSetting(`${prefix}_available_models`));
+    profiles[scope].availableModels = models;
+    profiles[scope].availableModelsDetails = models.map((m) => getModelMetadata(m, profiles[scope].provider));
     profiles[scope].modelsUpdatedAt = getSetting(`${prefix}_models_updated_at`) || '';
     profiles[scope].modelsError = getSetting(`${prefix}_models_error`) || '';
   }
@@ -113,7 +115,7 @@ function saveAllProfileSettings(profiles: any): void {
   }
 }
 
-async function fetchModelsForSettings(providerInput: string, baseUrlInput?: string, scope?: string, providedCredential?: string): Promise<{ models: string[]; error?: string }> {
+async function fetchModelsForSettings(providerInput: string, baseUrlInput?: string, scope?: string, providedCredential?: string): Promise<{ models: string[]; details: ModelDetail[]; error?: string }> {
   const provider = normalizeProvider(providerInput);
   const config = getProviderConfig(provider);
   const baseUrl = (baseUrlInput || config.baseUrl).replace(/\/+$/, '');
@@ -127,17 +129,24 @@ async function fetchModelsForSettings(providerInput: string, baseUrlInput?: stri
     if (!response.ok) {
       const error = `HTTP ${response.status}`;
       saveModelsForScope(scope, [], error);
-      return { models: [], error };
+      return { models: [], details: [], error };
     }
     const json = await response.json() as any;
     const rawModels = provider === 'ollama' ? (json.models || []) : (json.data || json.models || []);
     const models = sortModels(provider, rawModels);
+
+    const details = rawModels.map((raw: any) => {
+      const id = modelId(provider, raw);
+      if (!id) return null;
+      return getModelMetadata(id, provider, raw);
+    }).filter(Boolean) as ModelDetail[];
+
     saveModelsForScope(scope, models, '');
-    return { models };
+    return { models, details };
   } catch (e: any) {
     const error = e.message || 'Erro ao buscar modelos do provedor';
     saveModelsForScope(scope, [], error);
-    return { models: [], error };
+    return { models: [], details: [], error };
   }
 }
 
@@ -174,7 +183,9 @@ router.post('/api/settings', (req: Request, res: Response) => {
 
   if (ai_provider !== undefined) setSetting('ai_provider', normalizeProvider(ai_provider));
   if (ai_api_key !== undefined && String(ai_api_key).trim().length > 0) {
-    setSetting('ai_api_key', encrypt(String(ai_api_key)));
+    if (!String(ai_api_key).includes('****')) {
+      setSetting('ai_api_key', encrypt(String(ai_api_key)));
+    }
   }
   if (ai_base_url !== undefined) setSetting('ai_base_url', String(ai_base_url));
   if (ai_model !== undefined) setSetting('ai_model', String(ai_model));
@@ -213,7 +224,7 @@ router.get('/api/settings/models', async (req: Request, res: Response) => {
   const baseUrl = req.query.baseUrl ? String(req.query.baseUrl) : undefined;
   const scope = req.query.scope ? String(req.query.scope) : undefined;
   const result = await fetchModelsForSettings(provider, baseUrl, scope);
-  res.json({ provider, models: result.models, all: result.models, filtered: false, error: result.error });
+  res.json({ provider, models: result.models, details: result.details, all: result.models, filtered: false, error: result.error });
 });
 
 router.post('/api/settings/provider-models', async (req: Request, res: Response) => {
@@ -222,7 +233,7 @@ router.post('/api/settings/provider-models', async (req: Request, res: Response)
   const scope = req.body?.scope ? String(req.body.scope) : undefined;
   const providedCredential = req.body?.credential ? String(req.body.credential) : undefined;
   const result = await fetchModelsForSettings(provider, baseUrl, scope, providedCredential);
-  res.json({ provider, models: result.models, all: result.models, filtered: false, error: result.error });
+  res.json({ provider, models: result.models, details: result.details, all: result.models, filtered: false, error: result.error });
 });
 
 router.post('/api/settings/test-model', async (req: Request, res: Response) => {
