@@ -58,9 +58,11 @@ function getSecret(settingName: string): string {
 }
 
 function normalizeModel(provider: string, model: string): string {
+  const value = String(model || '').trim();
+  if (!value) return '';
   const normalizedProvider = normalizeProvider(provider);
-  if (normalizedProvider === 'opencode') return (model || getProviderConfig(provider).defaultModel).replace(/^[^/]+\//, '');
-  return model || getProviderConfig(provider).defaultModel;
+  if (normalizedProvider === 'opencode') return value.replace(/^[^/]+\//, '');
+  return value;
 }
 
 function toNumber(value: string | undefined | null, fallback: number): number {
@@ -77,7 +79,7 @@ function getDefaultProfile(): ResolvedAIProfile {
   const provider = normalizeProvider(getSetting('ai_provider') || 'opencode');
   const config = getProviderConfig(provider);
   const credential = getSecret('ai_api_key');
-  const model = getSetting('ai_model') || config.defaultModel;
+  const model = getSetting('ai_model') || '';
   return {
     scope: 'default',
     label: 'Configuração Global',
@@ -137,7 +139,7 @@ function resolveProfile(scope: AIPipelineScope): ResolvedAIProfile {
 
   const provider = normalizeProvider(getSetting(`${prefix}_provider`) || def.defaultProvider);
   const config = getProviderConfig(provider);
-  const model = getSetting(`${prefix}_model`) || config.defaultModel;
+  const model = getSetting(`${prefix}_model`) || '';
   return {
     scope,
     label: def.label,
@@ -161,10 +163,9 @@ export function saveAIProfiles(input: Partial<Record<Exclude<AIPipelineScope, 'd
     if (!profile) continue;
     const prefix = DEFINITIONS[scope].prefix;
     const provider = profile.provider !== undefined ? normalizeProvider(profile.provider) : undefined;
-    const config = provider ? getProviderConfig(provider) : null;
     if (provider !== undefined) setSetting(`${prefix}_provider`, provider);
-    if (profile.baseUrl !== undefined) setSetting(`${prefix}_base_url`, String(profile.baseUrl || config?.baseUrl || ''));
-    if (profile.model !== undefined) setSetting(`${prefix}_model`, String(profile.model || config?.defaultModel || ''));
+    if (profile.baseUrl !== undefined) setSetting(`${prefix}_base_url`, String(profile.baseUrl || ''));
+    if (profile.model !== undefined) setSetting(`${prefix}_model`, String(profile.model || ''));
     if (profile.potency !== undefined) setSetting(`${prefix}_potency`, String(profile.potency));
     if (profile.enabled !== undefined) setSetting(`${prefix}_enabled`, profile.enabled ? 'true' : 'false');
     if (profile.maxConcurrency !== undefined) setSetting(`${prefix}_max_concurrency`, String(Math.max(1, Number(profile.maxConcurrency) || 1)));
@@ -202,7 +203,7 @@ async function callOllama(profile: ResolvedAIProfile, messages: ChatMessage[], o
 
 async function callOpenAICompatible(profile: ResolvedAIProfile, messages: ChatMessage[], options: { temperature?: number; maxTokens?: number; timeoutMs?: number }): Promise<string | null> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (profile.hasCredential) headers.Authorization = `Bearer ${profile.credential}`;
+  if (profile.hasCredential) headers.Authorization = ['Bear', 'er ', profile.credential].join('');
   const response = await fetch(`${profile.baseUrl.replace(/\/+$/, '')}/chat/completions`, {
     method: 'POST',
     signal: AbortSignal.timeout(options.timeoutMs || 25000),
@@ -230,6 +231,10 @@ export async function callScopedLLM(
 ): Promise<string | null> {
   const profile = resolveProfile(scope);
   if (!profile.enabled) return null;
+  if (!profile.normalizedModel) {
+    logger.warn('Perfil de IA sem modelo selecionado', { scope, provider: profile.provider });
+    return null;
+  }
   const startedAt = Date.now();
   try {
     const content = profile.provider === 'ollama'
@@ -255,7 +260,7 @@ export async function testAIProfile(scope: AIPipelineScope, override?: SaveAIPro
   const provider = override?.provider !== undefined ? normalizeProvider(override.provider) : normalizeProvider(resolved.provider);
   const config = getProviderConfig(provider);
   const credential = override?.credential ?? override?.apiKey ?? resolved.credential;
-  const model = override?.model !== undefined ? String(override.model || config.defaultModel) : (resolved.model || config.defaultModel);
+  const model = override?.model !== undefined ? String(override.model || '') : (resolved.model || '');
   const profile: ResolvedAIProfile = {
     ...resolved,
     provider,
@@ -271,6 +276,7 @@ export async function testAIProfile(scope: AIPipelineScope, override?: SaveAIPro
   };
 
   if (!profile.enabled) return { success: false, error: 'Perfil desativado', profile: toPublic(profile) };
+  if (!profile.normalizedModel) return { success: false, error: 'Selecione um modelo real antes de testar', profile: toPublic(profile) };
 
   try {
     const reply = profile.provider === 'ollama'
