@@ -1,0 +1,17 @@
+node_modules/
+backend/dist/
+backend/logs/
+backend/data/cache/
+backend/data/*.db
+.env
+backend/.env
+*.log
+**/*.log
+*.traineddata
+scratch/
+.DS_Store
+coverage/
+.vscode/
+.idea/
+server_out.log
+server_err.log

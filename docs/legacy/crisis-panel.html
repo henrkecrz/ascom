@@ -1,0 +1,663 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Painel de Crise — ASCOM Novacap</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:oklch(7% 0.012 250);
+  --surface:oklch(11% 0.014 250);
+  --surface-2:oklch(15% 0.016 250);
+  --fg:oklch(95% 0.005 250);
+  --fg-2:oklch(75% 0.008 250);
+  --muted:oklch(52% 0.01 250);
+  --border:oklch(18% 0.015 250);
+  --accent:oklch(58% 0.16 255);
+  --accent-subtle:oklch(58% 0.16 255 / 0.12);
+  --crisis:oklch(58% 0.19 30);
+  --crisis-subtle:oklch(58% 0.19 30 / 0.12);
+  --crisis-bg:oklch(7% 0.012 250);
+  --crisis-border:oklch(20% 0.04 30);
+  --success:oklch(58% 0.15 145);
+  --success-subtle:oklch(58% 0.15 145 / 0.1);
+  --warning:oklch(68% 0.14 85);
+  --warning-subtle:oklch(68% 0.14 85 / 0.1);
+  --font:'Inter',system-ui,-apple-system,sans-serif;
+  --font-mono:'JetBrains Mono','Fira Code',monospace;
+  --radius:10px;
+  --radius-sm:6px;
+}
+html{font-size:15px}
+body{
+  font-family:var(--font);
+  background:var(--bg);
+  color:var(--fg);
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+  min-height:100vh;
+  transition:background 0.3s;
+}
+body.crisis-active{
+  background:var(--crisis-bg);
+}
+
+/* Pulse animation */
+@keyframes crisis-pulse{
+  0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(239,68,68,0.4)}
+  50%{opacity:0.85;box-shadow:0 0 0 8px rgba(239,68,68,0)}
+}
+@keyframes crisis-banner-pulse{
+  0%,100%{opacity:1}
+  50%{opacity:0.9}
+}
+@keyframes slideDown{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes checkBounce{0%{transform:scale(0)}50%{transform:scale(1.2)}100%{transform:scale(1)}}
+
+.app{display:flex;height:100vh;overflow:hidden}
+
+/* Sidebar */
+.sidebar{
+  width:240px;flex-shrink:0;
+  background:var(--surface);
+  border-right:1px solid var(--border);
+  display:flex;flex-direction:column;
+  transition:background 0.3s;
+}
+body.crisis-active .sidebar{border-right-color:var(--crisis-border)}
+.sidebar-brand{
+  padding:18px 20px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:10px;
+}
+body.crisis-active .sidebar-brand{border-bottom-color:var(--crisis-border)}
+.sidebar-brand-icon{
+  width:32px;height:32px;border-radius:var(--radius-sm);
+  background:var(--accent);display:flex;
+  align-items:center;justify-content:center;
+  font-size:0.75rem;font-weight:700;color:#fff;flex-shrink:0;
+  transition:background 0.3s;
+}
+body.crisis-active .sidebar-brand-icon{background:var(--crisis)}
+.sidebar-brand-name{font-size:0.78rem;font-weight:700;line-height:1.2}
+.sidebar-brand-sub{font-size:0.58rem;color:var(--muted);letter-spacing:0.3px;margin-top:1px}
+.sidebar-nav{flex:1;overflow-y:auto;padding:10px 10px}
+.sidebar-section{font-size:0.6rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.8px;padding:12px 10px 6px}
+.sidebar-item{
+  display:flex;align-items:center;gap:10px;
+  padding:7px 10px;margin-bottom:1px;border-radius:var(--radius-sm);
+  cursor:pointer;font-size:0.78rem;font-weight:400;
+  color:var(--fg-2);border:none;background:none;width:100%;
+  font-family:var(--font);transition:all 0.15s;position:relative;
+}
+.sidebar-item:hover{background:var(--surface-2);color:var(--fg)}
+.sidebar-item.active{background:var(--crisis-subtle);color:var(--crisis);font-weight:600}
+.sidebar-item.active::before{
+  content:'';position:absolute;left:-10px;top:4px;bottom:4px;
+  width:3px;background:var(--crisis);border-radius:2px;
+}
+.sidebar-item svg{width:16px;height:16px;flex-shrink:0;opacity:0.7}
+.sidebar-item.active svg{opacity:1}
+.sidebar-footer{padding:10px;border-top:1px solid var(--border);font-size:0.6rem;color:var(--muted);text-align:center}
+body.crisis-active .sidebar-footer{border-top-color:var(--crisis-border)}
+
+/* Main */
+.main{flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden}
+
+/* Topbar */
+.topbar{
+  height:52px;flex-shrink:0;display:flex;align-items:center;
+  justify-content:space-between;padding:0 24px;
+  border-bottom:1px solid var(--border);background:var(--bg);
+  transition:all 0.3s;
+}
+body.crisis-active .topbar{
+  border-bottom-color:var(--crisis-border);
+  background:oklch(8% 0.015 30);
+}
+.topbar-left{display:flex;align-items:center;gap:12px}
+.topbar-title{font-size:0.85rem;font-weight:600}
+.topbar-breadcrumb{font-size:0.72rem;color:var(--muted)}
+.topbar-right{display:flex;align-items:center;gap:8px}
+.topbar-btn{
+  width:32px;height:32px;border-radius:var(--radius-sm);
+  background:var(--surface);border:1px solid var(--border);
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  color:var(--fg-2);transition:all 0.15s;
+}
+.topbar-btn:hover{background:var(--surface-2);color:var(--fg)}
+
+/* Content */
+.content{flex:1;overflow-y:auto;padding:24px;transition:all 0.3s}
+.content-inner{max-width:1000px;margin:0 auto}
+
+/* Crisis banner */
+.crisis-banner{
+  display:none;align-items:center;gap:12px;
+  padding:10px 16px;border-radius:var(--radius);
+  background:var(--crisis-subtle);border:1px solid var(--crisis);
+  margin-bottom:16px;
+  animation:slideDown 0.3s ease-out;
+}
+.crisis-banner.active{display:flex}
+.crisis-banner-icon{
+  width:32px;height:32px;border-radius:50%;
+  background:var(--crisis);display:flex;align-items:center;
+  justify-content:center;flex-shrink:0;
+}
+.crisis-banner-text{flex:1;font-size:0.82rem;font-weight:600}
+.crisis-banner-meta{font-size:0.7rem;color:var(--fg-2)}
+
+/* Activate crisis button */
+.activate-btn{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:10px 20px;border-radius:var(--radius-sm);
+  font-size:0.82rem;font-family:var(--font);font-weight:600;
+  cursor:pointer;transition:all 0.15s;
+  border:1px solid var(--crisis);
+  background:transparent;color:var(--crisis);
+}
+.activate-btn:hover{background:var(--crisis-subtle)}
+.activate-btn.active{
+  background:var(--crisis);color:#fff;
+  animation:crisis-pulse 2s ease-in-out infinite;
+}
+.activate-btn svg{width:16px;height:16px}
+
+/* Protocol cards */
+.protocol-list{display:flex;flex-direction:column;gap:8px;margin-bottom:20px}
+.protocol-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);padding:14px 16px;
+  cursor:pointer;transition:all 0.15s;
+  position:relative;
+}
+.protocol-card:hover{border-color:var(--accent);transform:translateY(-1px)}
+.protocol-card.selected{border-color:var(--crisis);background:var(--crisis-subtle)}
+.protocol-card-bar{position:absolute;top:0;left:0;right:0;height:3px;border-radius:var(--radius) var(--radius) 0 0}
+.protocol-card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
+.protocol-card-title{font-size:0.82rem;font-weight:600}
+.protocol-card-status{font-size:0.6rem;font-weight:600;padding:2px 8px;border-radius:99px}
+.protocol-card-desc{font-size:0.72rem;color:var(--fg-2);margin-bottom:6px}
+.protocol-card-meta{font-size:0.65rem;color:var(--muted)}
+
+/* Crisis active view */
+.crisis-view{display:none;animation:fadeIn 0.3s ease-out}
+.crisis-view.active{display:block}
+
+.crisis-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}
+
+.crisis-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);overflow:hidden;
+}
+body.crisis-active .crisis-card{border-color:var(--crisis-border)}
+.crisis-card-header{
+  display:flex;align-items:center;gap:8px;
+  padding:12px 14px;border-bottom:1px solid var(--border);
+  font-size:0.72rem;font-weight:600;
+}
+body.crisis-active .crisis-card-header{border-bottom-color:var(--crisis-border)}
+.crisis-card-body{padding:12px 14px 14px}
+
+/* Steps */
+.step-item{
+  display:flex;align-items:flex-start;gap:10px;
+  padding:8px 0;border-bottom:1px solid var(--border);
+  cursor:pointer;transition:all 0.15s;
+  font-size:0.78rem;
+}
+.step-item:last-child{border-bottom:none}
+.step-checkbox{
+  width:20px;height:20px;border-radius:50%;
+  border:2px solid var(--border);flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  transition:all 0.15s;margin-top:1px;
+}
+.step-item.done .step-checkbox{
+  background:var(--success);border-color:var(--success);
+}
+.step-checkbox svg{display:none}
+.step-item.done .step-checkbox svg{display:block}
+.step-item.done .step-text{color:var(--muted);text-decoration:line-through}
+.step-number{font-size:0.6rem;font-weight:700;color:var(--muted);min-width:16px}
+.step-text{flex:1;color:var(--fg-2)}
+
+/* Spokesperson */
+.spoke-item{
+  display:flex;align-items:center;gap:10px;
+  padding:6px 0;font-size:0.78rem;
+}
+.spoke-avatar{
+  width:28px;height:28px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:0.6rem;font-weight:700;color:#fff;flex-shrink:0;
+}
+.spoke-info{flex:1}
+.spoke-name{font-weight:500}
+.spoke-role{font-size:0.65rem;color:var(--muted)}
+.spoke-phone{font-size:0.65rem;color:var(--accent);font-family:var(--font-mono)}
+
+/* Contacts quick */
+.contact-item{
+  display:flex;align-items:center;gap:8px;
+  padding:6px 0;font-size:0.75rem;
+  border-bottom:1px solid var(--border);
+}
+.contact-item:last-child{border-bottom:none}
+.contact-label{font-weight:500;min-width:80px}
+.contact-value{color:var(--fg-2);font-family:var(--font-mono);font-size:0.7rem}
+
+/* Progress */
+.progress-strip{
+  display:flex;gap:4px;margin-top:8px;
+}
+.progress-step{
+  flex:1;height:4px;border-radius:2px;
+  background:var(--border);transition:all 0.3s;
+}
+.progress-step.done{background:var(--success)}
+.progress-step.active{background:var(--accent)}
+
+/* Checklist progress */
+.checklist-progress{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.checklist-progress-bar{flex:1;height:4px;background:var(--border);border-radius:2px;overflow:hidden}
+.checklist-progress-fill{height:100%;border-radius:2px;background:var(--success);transition:width 0.3s}
+.checklist-progress-text{font-size:0.65rem;color:var(--muted);white-space:nowrap}
+
+/* Spokespersons grid */
+.spoke-grid{display:flex;flex-direction:column;gap:8px}
+
+/* Responsive */
+@media(max-width:900px){
+  .sidebar{width:56px}
+  .sidebar-brand-name,.sidebar-brand-sub,.sidebar-section,.sidebar-item span:not(svg){display:none}
+  .sidebar-item{padding:7px;justify-content:center}
+  .sidebar-item.active::before{left:0}
+  .sidebar-brand{padding:14px 8px;justify-content:center}
+  .crisis-grid{grid-template-columns:1fr}
+}
+@media(max-width:600px){
+  .content{padding:16px}
+}
+
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+::selection{background:var(--accent-subtle)}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+
+<!-- Sidebar -->
+<aside class="sidebar">
+  <div class="sidebar-brand">
+    <div class="sidebar-brand-icon">PC</div>
+    <div>
+      <div class="sidebar-brand-name">Plano de Comunicação</div>
+      <div class="sidebar-brand-sub">NOVACAP · ASCOM</div>
+    </div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="sidebar-section">Essencial</div>
+    <button class="sidebar-item" onclick="location.href='dashboard.html'">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
+      <span>Painel</span>
+    </button>
+    <button class="sidebar-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      <span>Consultar</span>
+    </button>
+    <button class="sidebar-item active">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      <span>Crise</span>
+    </button>
+    <div class="sidebar-section">Ferramentas</div>
+    <button class="sidebar-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      <span>Release</span>
+    </button>
+    <button class="sidebar-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      <span>Simulador</span>
+    </button>
+  </nav>
+  <div class="sidebar-footer">147 docs · online</div>
+</aside>
+
+<!-- Main -->
+<div class="main">
+  <header class="topbar" id="topbar">
+    <div class="topbar-left">
+      <span class="topbar-title">Painel de Crise</span>
+      <span class="topbar-breadcrumb">· Protocolos e resposta a emergências</span>
+    </div>
+    <div class="topbar-right">
+      <span id="readinessBadge" style="font-size:0.7rem;font-weight:600;padding:4px 10px;border-radius:99px;background:var(--warning-subtle);color:var(--warning)">Score: 65%</span>
+      <button class="activate-btn" id="crisisToggle" onclick="toggleCrisis()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        Ativar Modo Crise
+      </button>
+    </div>
+  </header>
+
+  <div class="content" id="content">
+    <div class="content-inner">
+
+      <!-- Crisis banner -->
+      <div class="crisis-banner" id="crisisBanner">
+        <div class="crisis-banner-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        </div>
+        <div>
+          <div class="crisis-banner-text">CRISE ATIVA — Protocolo: Crise com Imprensa</div>
+          <div class="crisis-banner-meta">Iniciado há 12 min · Ações recomendadas em andamento</div>
+        </div>
+        <button class="topbar-btn" onclick="toggleCrisis()" title="Desativar modo crise" style="flex-shrink:0">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <!-- Normal view: protocol list -->
+      <div id="normalView">
+        <div class="protocol-list">
+          <div class="protocol-card selected" onclick="selectProtocol(this,0)">
+            <div class="protocol-card-bar" style="background:var(--crisis)"></div>
+            <div class="protocol-card-header">
+              <span class="protocol-card-title">Crise com Imprensa</span>
+              <span class="protocol-card-status" style="background:var(--success-subtle);color:var(--success)">atualizado</span>
+            </div>
+            <div class="protocol-card-desc">Protocolo para gerenciamento de crises envolvendo veículos de imprensa</div>
+            <div class="protocol-card-meta">Última atualização: 15/03/2026 · 3 porta-vozes designados</div>
+          </div>
+          <div class="protocol-card" onclick="selectProtocol(this,1)">
+            <div class="protocol-card-bar" style="background:var(--warning)"></div>
+            <div class="protocol-card-header">
+              <span class="protocol-card-title">Crise em Obras</span>
+              <span class="protocol-card-status" style="background:var(--warning-subtle);color:var(--warning)">revisar</span>
+            </div>
+            <div class="protocol-card-desc">Procedimentos para incidentes em canteiros de obra e equipamentos</div>
+            <div class="protocol-card-meta">Última atualização: 10/01/2026 · 2 porta-vozes designados</div>
+          </div>
+          <div class="protocol-card" onclick="selectProtocol(this,2)">
+            <div class="protocol-card-bar" style="background:var(--success)"></div>
+            <div class="protocol-card-header">
+              <span class="protocol-card-title">Crise Ambiental</span>
+              <span class="protocol-card-status" style="background:var(--success-subtle);color:var(--success)">atualizado</span>
+            </div>
+            <div class="protocol-card-desc">Protocolo para vazamentos, danos ambientais e fiscalização</div>
+            <div class="protocol-card-meta">Última atualização: 20/02/2026 · 2 porta-vozes designados</div>
+          </div>
+        </div>
+
+        <!-- Readiness -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px">
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px">
+            <div style="display:flex;align-items:center;gap:12px">
+              <div class="health-ring" style="width:44px;height:44px;position:relative;flex-shrink:0">
+                <svg width="44" height="44" viewBox="0 0 120 120">
+                  <circle cx="60" cy="60" r="50" fill="none" stroke="var(--border)" stroke-width="10"/>
+                  <circle cx="60" cy="60" r="50" fill="none" stroke="var(--warning)" stroke-width="10" stroke-dasharray="314" stroke-dashoffset="110" stroke-linecap="round"/>
+                </svg>
+                <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:700;color:var(--warning)">65%</div>
+              </div>
+              <div style="flex:1">
+                <div style="font-size:0.72rem;font-weight:600;margin-bottom:2px">Prontidão para Crise</div>
+                <div style="font-size:0.65rem;color:var(--muted)">3 protocolos · 7 porta-vozes cadastrados</div>
+              </div>
+            </div>
+          </div>
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px">
+            <div style="display:flex;align-items:center;gap:12px">
+              <div style="width:44px;height:44px;border-radius:var(--radius-sm);background:var(--accent-subtle);display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--accent)">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
+              </div>
+              <div style="flex:1">
+                <div style="font-size:0.72rem;font-weight:600;margin-bottom:2px">Simular Cenário</div>
+                <div style="font-size:0.65rem;color:var(--muted)">Teste sua resposta a situações hipotéticas</div>
+              </div>
+              <button style="padding:6px 12px;border-radius:var(--radius-sm);font-size:0.7rem;font-family:var(--font);font-weight:500;cursor:pointer;border:1px solid var(--border);background:var(--surface-2);color:var(--fg-2);transition:all 0.15s" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">Simular</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Crisis active view -->
+      <div class="crisis-view" id="crisisView">
+        <!-- Protocol header -->
+        <div style="margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <div style="display:flex;align-items:center;gap:10px;flex:1">
+            <div style="width:6px;height:40px;border-radius:3px;background:var(--crisis)"></div>
+            <div>
+              <div style="font-size:1.1rem;font-weight:700">Crise com Imprensa</div>
+              <div style="font-size:0.72rem;color:var(--muted)">Protocolo de resposta · Ativado há 12 min</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <span style="font-size:0.7rem;font-weight:600;padding:4px 10px;border-radius:99px;background:var(--crisis-subtle);color:var(--crisis)">🔴 EM ANDAMENTO</span>
+            <span style="font-size:0.7rem;font-weight:600;padding:4px 10px;border-radius:99px;background:var(--accent-subtle);color:var(--accent)">alta prioridade</span>
+          </div>
+        </div>
+
+        <!-- Grid -->
+        <div class="crisis-grid">
+          <!-- Checklist -->
+          <div class="crisis-card">
+            <div class="crisis-card-header">
+              <input type="checkbox" id="checklistDone" onchange="updateChecklistProgress()" style="accent-color:var(--success)">
+              <span>Checklist de Ação</span>
+            </div>
+            <div class="crisis-card-body">
+              <div class="checklist-progress">
+                <div class="checklist-progress-bar">
+                  <div class="checklist-progress-fill" id="checklistFill" style="width:40%"></div>
+                </div>
+                <span class="checklist-progress-text" id="checklistLabel">2 de 5 concluídos</span>
+              </div>
+              <div class="step-item done" onclick="toggleStep(this)">
+                <div class="step-checkbox"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20,6 9,17 4,12"/></svg></div>
+                <span class="step-number">01</span>
+                <span class="step-text">Comunicar imediatamente o presidente e diretoria</span>
+              </div>
+              <div class="step-item done" onclick="toggleStep(this)">
+                <div class="step-checkbox"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20,6 9,17 4,12"/></svg></div>
+                <span class="step-number">02</span>
+                <span class="step-text">Reunir equipe da ASCOM para avaliação inicial</span>
+              </div>
+              <div class="step-item" onclick="toggleStep(this)">
+                <div class="step-checkbox"></div>
+                <span class="step-number">03</span>
+                <span class="step-text">Preparar nota oficial e posicionamento</span>
+              </div>
+              <div class="step-item" onclick="toggleStep(this)">
+                <div class="step-checkbox"></div>
+                <span class="step-number">04</span>
+                <span class="step-text">Designar porta-voz oficial para a crise</span>
+              </div>
+              <div class="step-item" onclick="toggleStep(this)">
+                <div class="step-checkbox"></div>
+                <span class="step-number">05</span>
+                <span class="step-text">Monitorar veículos de imprensa e redes sociais</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Porta-Vozes + Contatos -->
+          <div class="crisis-card">
+            <div class="crisis-card-header">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              <span>Porta-Vozes</span>
+            </div>
+            <div class="crisis-card-body">
+              <div class="spoke-grid">
+                <div class="spoke-item">
+                  <div class="spoke-avatar" style="background:#ef4444">JS</div>
+                  <div class="spoke-info">
+                    <div class="spoke-name">João Silva</div>
+                    <div class="spoke-role">Presidente — decisões finais</div>
+                  </div>
+                  <button style="padding:4px 8px;border-radius:4px;font-size:0.6rem;font-family:var(--font);font-weight:500;cursor:pointer;border:1px solid var(--accent);background:var(--accent-subtle);color:var(--accent)" onclick="alert('Ligando para João Silva...')">Ligar</button>
+                </div>
+                <div class="spoke-item">
+                  <div class="spoke-avatar" style="background:#a855f7">MS</div>
+                  <div class="spoke-info">
+                    <div class="spoke-name">Maria Santos</div>
+                    <div class="spoke-role">Assessora Chefe — coordenação ASCOM</div>
+                  </div>
+                  <button style="padding:4px 8px;border-radius:4px;font-size:0.6rem;font-family:var(--font);font-weight:500;cursor:pointer;border:1px solid var(--accent);background:var(--accent-subtle);color:var(--accent)" onclick="alert('Ligando para Maria Santos...')">Ligar</button>
+                </div>
+                <div class="spoke-item">
+                  <div class="spoke-avatar" style="background:#3b82f6">CP</div>
+                  <div class="spoke-info">
+                    <div class="spoke-name">Carlos Pereira</div>
+                    <div class="spoke-role">Diretor de Obras — questões técnicas</div>
+                  </div>
+                  <button style="padding:4px 8px;border-radius:4px;font-size:0.6rem;font-family:var(--font);font-weight:500;cursor:pointer;border:1px solid var(--accent);background:var(--accent-subtle);color:var(--accent)" onclick="alert('Ligando para Carlos Pereira...')">Ligar</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Contatos de Emergência -->
+          <div class="crisis-card">
+            <div class="crisis-card-header">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+              <span>Contatos de Emergência</span>
+            </div>
+            <div class="crisis-card-body">
+              <div class="contact-item">
+                <span class="contact-label">Presidente</span>
+                <span class="contact-value">(61) 99999-0001</span>
+              </div>
+              <div class="contact-item">
+                <span class="contact-label">ASCOM</span>
+                <span class="contact-value">(61) 99999-0002</span>
+              </div>
+              <div class="contact-item">
+                <span class="contact-label">Jurídico</span>
+                <span class="contact-value">(61) 99999-0003</span>
+              </div>
+              <div class="contact-item">
+                <span class="contact-label">Imprensa</span>
+                <span class="contact-value">ascom@novacap.df.gov.br</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Nota Rápida -->
+          <div class="crisis-card">
+            <div class="crisis-card-header">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              <span>Nota Rápida</span>
+            </div>
+            <div class="crisis-card-body">
+              <textarea placeholder="Registre observações sobre esta crise..." style="width:100%;min-height:70px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 10px;color:var(--fg);font-size:0.75rem;font-family:var(--font);outline:none;resize:vertical;transition:border-color 0.15s" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'"></textarea>
+              <div style="display:flex;gap:6px;margin-top:8px">
+                <button style="flex:1;padding:7px;border-radius:var(--radius-sm);font-size:0.7rem;font-family:var(--font);font-weight:600;cursor:pointer;border:none;background:var(--accent);color:#fff;transition:all 0.15s" onmouseover="this.style.filter='brightness(1.1)'" onmouseout="this.style.filter='none'">Salvar Nota</button>
+                <button style="flex:1;padding:7px;border-radius:var(--radius-sm);font-size:0.7rem;font-family:var(--font);font-weight:500;cursor:pointer;border:1px solid var(--border);background:var(--surface-2);color:var(--fg-2);transition:all 0.15s" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'" onclick="this.previousElementSibling.value=''">Limpar</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Timeline quick -->
+        <div class="crisis-card">
+          <div class="crisis-card-header">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
+            <span>Linha do Tempo da Crise</span>
+          </div>
+          <div class="crisis-card-body">
+            <div style="position:relative;padding-left:20px">
+              <div style="position:absolute;left:8px;top:4px;bottom:4px;width:2px;background:var(--border)"></div>
+              <div style="position:relative;padding-bottom:12px">
+                <div style="position:absolute;left:-16px;top:4px;width:8px;height:8px;border-radius:50%;background:var(--crisis)"></div>
+                <div style="font-size:0.7rem;color:var(--fg-2)">11:48 — Crise identificada e comunicada ao presidente</div>
+              </div>
+              <div style="position:relative;padding-bottom:12px">
+                <div style="position:absolute;left:-16px;top:4px;width:8px;height:8px;border-radius:50%;background:var(--accent)"></div>
+                <div style="font-size:0.7rem;color:var(--fg-2)">11:52 — Equipe ASCOM reunida para avaliação</div>
+              </div>
+              <div style="position:relative;padding-bottom:12px">
+                <div style="position:absolute;left:-16px;top:4px;width:8px;height:8px;border-radius:50%;background:var(--border)"></div>
+                <div style="font-size:0.7rem;color:var(--muted)">— Nota oficial em preparação</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+</div>
+
+<script>
+let crisisActive = false
+let selectedProtocol = 0
+
+function toggleCrisis() {
+  crisisActive = !crisisActive
+  document.body.classList.toggle('crisis-active', crisisActive)
+  document.getElementById('crisisToggle').classList.toggle('active', crisisActive)
+  document.getElementById('crisisToggle').innerHTML = crisisActive
+    ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Desativar Modo Crise'
+    : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Ativar Modo Crise'
+  document.getElementById('normalView').style.display = crisisActive ? 'none' : 'block'
+  document.getElementById('crisisView').classList.toggle('active', crisisActive)
+  document.getElementById('crisisBanner').classList.toggle('active', crisisActive)
+  document.getElementById('readinessBadge').textContent = crisisActive ? '⚡ CRISE ATIVA' : 'Score: 65%'
+  document.getElementById('readinessBadge').style.background = crisisActive ? 'var(--crisis-subtle)' : 'var(--warning-subtle)'
+  document.getElementById('readinessBadge').style.color = crisisActive ? 'var(--crisis)' : 'var(--warning)'
+  if(crisisActive) localStorage.setItem('crisis_mode','active')
+  else localStorage.removeItem('crisis_mode')
+}
+
+function selectProtocol(el, idx) {
+  selectedProtocol = idx
+  document.querySelectorAll('.protocol-card').forEach(c => c.classList.remove('selected'))
+  el.classList.add('selected')
+}
+
+function toggleStep(el) {
+  el.classList.toggle('done')
+  updateChecklistProgress()
+  localStorage.setItem('crisis_checklist', JSON.stringify(
+    Array.from(document.querySelectorAll('.step-item')).map(s => s.classList.contains('done'))
+  ))
+}
+
+function updateChecklistProgress() {
+  const steps = document.querySelectorAll('.step-item')
+  const done = Array.from(steps).filter(s => s.classList.contains('done')).length
+  const pct = steps.length > 0 ? (done / steps.length) * 100 : 0
+  document.getElementById('checklistFill').style.width = pct + '%'
+  document.getElementById('checklistLabel').textContent = `${done} de ${steps.length} concluídos`
+}
+
+// Restore state
+try {
+  const saved = JSON.parse(localStorage.getItem('crisis_checklist'))
+  if(saved) {
+    document.querySelectorAll('.step-item').forEach((s,i) => {
+      if(saved[i]) s.classList.add('done')
+    })
+    updateChecklistProgress()
+  }
+} catch(e){}
+
+if(localStorage.getItem('crisis_mode') === 'active') {
+  toggleCrisis()
+}
+
+// Keyboard shortcuts
+document.addEventListener('keydown', function(e) {
+  if(e.key === 'Escape' && crisisActive) toggleCrisis()
+})
+</script>
+</body>
+</html>

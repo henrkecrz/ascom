@@ -1,0 +1,44 @@
+{
+  "name": "plano-comunicacao-backend",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "scan": "tsx src/scanner.ts",
+    "analyze": "tsx src/analyze.ts",
+    "full": "tsx src/scanner.ts && tsx src/analyze.ts",
+    "lint": "eslint src --ext .ts",
+    "lint:fix": "eslint src --ext .ts --fix",
+    "test": "tsx --test src/**/*.test.ts"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.10.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.4.2",
+    "express": "^4.21.0",
+    "express-rate-limit": "^8.5.2",
+    "fast-xml-parser": "^5.9.0",
+    "htmlparser2": "^12.0.0",
+    "jsonwebtoken": "^9.0.3",
+    "jszip": "^3.10.1",
+    "mammoth": "^1.12.0",
+    "natural": "^8.1.1",
+    "pdf-parse": "^2.4.5",
+    "sharp": "^0.35.1",
+    "sql.js": "^1.11.0",
+    "tesseract.js": "^7.0.0",
+    "word-extractor": "^1.0.4",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

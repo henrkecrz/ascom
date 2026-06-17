@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plano de Comunicação — Protótipo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:oklch(7% 0.012 250);
+  --surface:oklch(11% 0.014 250);
+  --surface-2:oklch(15% 0.016 250);
+  --fg:oklch(95% 0.005 250);
+  --fg-2:oklch(75% 0.008 250);
+  --muted:oklch(52% 0.01 250);
+  --border:oklch(18% 0.015 250);
+  --accent:oklch(58% 0.16 255);
+  --accent-subtle:oklch(58% 0.16 255 / 0.12);
+  --crisis:oklch(58% 0.19 30);
+  --success:oklch(58% 0.15 145);
+  --warning:oklch(68% 0.14 85);
+  --font:'Inter',system-ui,-apple-system,sans-serif;
+  --radius:10px;
+  --radius-sm:6px;
+}
+html{font-size:15px}
+body{
+  font-family:var(--font);background:var(--bg);color:var(--fg);line-height:1.5;
+  -webkit-font-smoothing:antialiased;min-height:100vh;
+  display:flex;flex-direction:column;align-items:center;
+  padding:60px 24px 80px;
+}
+.header{text-align:center;margin-bottom:40px;max-width:600px}
+.header-badge{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:3px 10px;border-radius:99px;background:var(--accent-subtle);
+  color:var(--accent);font-size:0.65rem;font-weight:600;letter-spacing:0.3px;
+  margin-bottom:14px;
+}
+.header-badge svg{width:12px;height:12px}
+.header h1{font-size:1.6rem;font-weight:800;margin-bottom:6px;letter-spacing:-0.02em}
+.header p{font-size:0.82rem;color:var(--fg-2);line-height:1.6}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;max-width:960px;width:100%}
+.card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);padding:20px;
+  transition:all 0.2s;cursor:pointer;text-decoration:none;display:block;
+}
+.card:hover{border-color:var(--accent);background:var(--surface-2);transform:translateY(-2px)}
+.card-top{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.card-icon{width:36px;height:36px;border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.card-title{font-size:0.85rem;font-weight:700;color:var(--fg)}
+.card-desc{font-size:0.72rem;color:var(--fg-2);line-height:1.5}
+.card-tags{display:flex;gap:4px;margin-top:10px;flex-wrap:wrap}
+.card-tag{padding:2px 7px;border-radius:99px;font-size:0.58rem;font-weight:500;background:var(--border);color:var(--muted)}
+.footer{text-align:center;margin-top:40px;font-size:0.65rem;color:var(--muted)}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-badge">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20,6 9,17 4,12"/></svg>
+    protótipo funcional
+  </div>
+  <h1>Plano de Comunicação</h1>
+  <p>Reimaginação da interface do centro de comando da ASCOM Novacap — visual institucional, autoritário e preparado para crise.</p>
+</div>
+
+<div class="grid">
+  <a class="card" href="dashboard.html">
+    <div class="card-top">
+      <div class="card-icon" style="background:var(--accent-subtle)">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
+      </div>
+      <div class="card-title">Command Center Dashboard</div>
+    </div>
+    <div class="card-desc">Painel principal com KPI cards, seções modulares, alertas, documentos recentes e score de saúde do plano.</div>
+    <div class="card-tags"><span class="card-tag">dashboard</span><span class="card-tag">kpis</span><span class="card-tag">visão geral</span></div>
+  </a>
+
+  <a class="card" href="crisis-panel.html">
+    <div class="card-top">
+      <div class="card-icon" style="background:oklch(58% 0.19 30 / 0.12)">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--crisis)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      </div>
+      <div class="card-title">Crisis Panel</div>
+    </div>
+    <div class="card-desc">Modo crise que transforma toda a interface com acento vermelho, checklist passo a passo, porta-vozes com contato rápido e timeline.</div>
+    <div class="card-tags"><span class="card-tag">crise</span><span class="card-tag">protocolos</span><span class="card-tag">checklist</span></div>
+  </a>
+
+  <a class="card" href="plan-health.html">
+    <div class="card-top">
+      <div class="card-icon" style="background:rgba(34,197,94,0.12)">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+      </div>
+      <div class="card-title">Plan Health</div>
+    </div>
+    <div class="card-desc">Score geral com anel de progresso, cobertura por seção, estatísticas de documentos e gaps detectados.</div>
+    <div class="card-tags"><span class="card-tag">saúde</span><span class="card-tag">métricas</span><span class="card-tag">gaps</span></div>
+  </a>
+
+  <a class="card" href="#">
+    <div class="card-top">
+      <div class="card-icon" style="background:rgba(6,182,212,0.12)">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#06b6d4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      </div>
+      <div class="card-title">Consult Chat</div>
+    </div>
+    <div class="card-desc">Chat com IA para consultar documentos, tirar dúvidas sobre protocolos e gerar relatórios em linguagem natural.</div>
+    <div class="card-tags"><span class="card-tag">ia</span><span class="card-tag">consulta</span><span class="card-tag">em breve</span></div>
+  </a>
+</div>
+
+<div class="footer">
+  Novacap ASCOM · Plano de Comunicação · Protótipo de Interface
+</div>
+
+</body>
+</html>

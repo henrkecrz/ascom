@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Saúde do Plano — ASCOM Novacap</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:oklch(7% 0.012 250);
+  --surface:oklch(11% 0.014 250);
+  --surface-2:oklch(15% 0.016 250);
+  --fg:oklch(95% 0.005 250);
+  --fg-2:oklch(75% 0.008 250);
+  --muted:oklch(52% 0.01 250);
+  --border:oklch(18% 0.015 250);
+  --accent:oklch(58% 0.16 255);
+  --accent-subtle:oklch(58% 0.16 255 / 0.12);
+  --crisis:oklch(58% 0.19 30);
+  --crisis-subtle:oklch(58% 0.19 30 / 0.12);
+  --success:oklch(58% 0.15 145);
+  --success-subtle:oklch(58% 0.15 145 / 0.1);
+  --warning:oklch(68% 0.14 85);
+  --warning-subtle:oklch(68% 0.14 85 / 0.1);
+  --font:'Inter',system-ui,-apple-system,sans-serif;
+  --radius:10px;
+  --radius-sm:6px;
+}
+html{font-size:15px}
+body{
+  font-family:var(--font);
+  background:var(--bg);
+  color:var(--fg);
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+  min-height:100vh;
+}
+.app{display:flex;height:100vh;overflow:hidden}
+
+/* Sidebar */
+.sidebar{width:240px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column}
+.sidebar-brand{padding:18px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.sidebar-brand-icon{width:32px;height:32px;border-radius:var(--radius-sm);background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:700;color:#fff;flex-shrink:0}
+.sidebar-brand-name{font-size:0.78rem;font-weight:700;line-height:1.2}
+.sidebar-brand-sub{font-size:0.58rem;color:var(--muted);letter-spacing:0.3px;margin-top:1px}
+.sidebar-nav{flex:1;overflow-y:auto;padding:10px}
+.sidebar-section{font-size:0.6rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.8px;padding:12px 10px 6px}
+.sidebar-item{display:flex;align-items:center;gap:10px;padding:7px 10px;margin-bottom:1px;border-radius:var(--radius-sm);cursor:pointer;font-size:0.78rem;font-weight:400;color:var(--fg-2);border:none;background:none;width:100%;font-family:var(--font);transition:all 0.15s;position:relative}
+.sidebar-item:hover{background:var(--surface-2);color:var(--fg)}
+.sidebar-item.active{background:var(--accent-subtle);color:var(--accent);font-weight:600}
+.sidebar-item.active::before{content:'';position:absolute;left:-10px;top:4px;bottom:4px;width:3px;background:var(--accent);border-radius:2px}
+.sidebar-item svg{width:16px;height:16px;flex-shrink:0;opacity:0.7}
+.sidebar-item.active svg{opacity:1}
+.sidebar-footer{padding:10px;border-top:1px solid var(--border);font-size:0.6rem;color:var(--muted);text-align:center}
+
+/* Main */
+.main{flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden}
+.topbar{height:52px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:0 24px;border-bottom:1px solid var(--border);background:var(--bg)}
+.topbar-left{display:flex;align-items:center;gap:12px}
+.topbar-title{font-size:0.85rem;font-weight:600}
+.topbar-breadcrumb{font-size:0.72rem;color:var(--muted)}
+.topbar-right{display:flex;align-items:center;gap:8px}
+.topbar-btn{width:32px;height:32px;border-radius:var(--radius-sm);background:var(--surface);border:1px solid var(--border);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--fg-2);transition:all 0.15s}
+.topbar-btn:hover{background:var(--surface-2);color:var(--fg)}
+.content{flex:1;overflow-y:auto;padding:24px}
+.content-inner{max-width:900px;margin:0 auto}
+
+/* Score hero */
+.score-hero{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);padding:24px;
+  margin-bottom:20px;display:flex;align-items:center;gap:28px;
+}
+.score-ring{width:80px;height:80px;position:relative;flex-shrink:0}
+.score-ring svg{transform:rotate(-90deg)}
+.score-ring-value{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:1.5rem;font-weight:800}
+.score-details{flex:1}
+.score-detail-row{display:flex;align-items:center;gap:8px;padding:5px 0;font-size:0.78rem}
+.score-detail-label{min-width:100px;font-weight:500}
+.score-detail-bar{flex:1;height:5px;background:var(--border);border-radius:3px;overflow:hidden}
+.score-detail-fill{height:100%;border-radius:3px;transition:width 0.5s}
+.score-detail-val{min-width:30px;text-align:right;font-weight:600;font-size:0.75rem}
+.score-meta{font-size:0.7rem;color:var(--muted);margin-top:8px}
+
+/* Stats grid */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:20px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;text-align:center}
+.stat-card-value{font-size:1.4rem;font-weight:700;margin-bottom:2px}
+.stat-card-label{font-size:0.65rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.3px}
+
+/* Section health rows */
+.section-row{
+  display:flex;align-items:center;gap:12px;
+  padding:10px 14px;border-radius:var(--radius-sm);
+  background:var(--surface);border:1px solid var(--border);
+  margin-bottom:6px;transition:all 0.15s;
+  cursor:pointer;
+}
+.section-row:hover{border-color:var(--accent)}
+.section-row-icon{width:32px;height:32px;border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.section-row-info{flex:1;min-width:0}
+.section-row-title{font-size:0.78rem;font-weight:600}
+.section-row-desc{font-size:0.65rem;color:var(--muted)}
+.section-row-bar{width:100px;flex-shrink:0}
+.section-row-bar-track{height:4px;background:var(--border);border-radius:2px;overflow:hidden}
+.section-row-bar-fill{height:100%;border-radius:2px}
+.section-row-status{font-size:0.65rem;font-weight:600;padding:2px 8px;border-radius:99px;flex-shrink:0}
+
+/* Gap cards */
+.gap-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);padding:14px 16px;
+  margin-bottom:8px;display:flex;align-items:center;gap:12px;
+}
+.gap-card:hover{border-color:var(--accent)}
+.gap-card-icon{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.gap-card-info{flex:1}
+.gap-card-title{font-size:0.78rem;font-weight:500}
+.gap-card-desc{font-size:0.65rem;color:var(--muted);margin-top:2px}
+.gap-card-action{padding:5px 10px;border-radius:var(--radius-sm);font-size:0.65rem;font-family:var(--font);font-weight:600;cursor:pointer;border:none;background:var(--accent);color:#fff;transition:all 0.15s}
+.gap-card-action:hover{filter:brightness(1.1)}
+
+@keyframes fadeInUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.animate-in{animation:fadeInUp 0.3s ease-out forwards;opacity:0}
+
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+::selection{background:var(--accent-subtle)}
+
+@media(max-width:900px){
+  .sidebar{width:56px}
+  .sidebar-brand-name,.sidebar-brand-sub,.sidebar-section,.sidebar-item span:not(svg){display:none}
+  .sidebar-item{padding:7px;justify-content:center}
+  .sidebar-item.active::before{left:0}
+  .sidebar-brand{padding:14px 8px;justify-content:center}
+  .score-hero{flex-direction:column;text-align:center}
+}
+@media(max-width:600px){
+  .stats-grid{grid-template-columns:repeat(2,1fr)}
+  .section-row-bar{width:60px}
+}
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="sidebar">
+  <div class="sidebar-brand">
+    <div class="sidebar-brand-icon">PC</div>
+    <div><div class="sidebar-brand-name">Plano de Comunicação</div><div class="sidebar-brand-sub">NOVACAP · ASCOM</div></div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="sidebar-section">Essencial</div>
+    <button class="sidebar-item" onclick="location.href='dashboard.html'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg><span>Painel</span></button>
+    <button class="sidebar-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span>Consultar</span></button>
+    <button class="sidebar-item" onclick="location.href='crisis-panel.html'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg><span>Crise</span></button>
+    <div class="sidebar-section">Base de Dados</div>
+    <button class="sidebar-item active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg><span>Saúde</span></button>
+    <button class="sidebar-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg><span>Timeline</span></button>
+    <button class="sidebar-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><span>Calendário</span></button>
+  </nav>
+  <div class="sidebar-footer" id="sidebarFooter">carregando...</div>
+</aside>
+
+<div class="main">
+  <header class="topbar">
+    <div class="topbar-left">
+      <span class="topbar-title">Saúde do Plano</span>
+      <span class="topbar-breadcrumb">· Cobertura, gaps e métricas</span>
+    </div>
+    <div class="topbar-right">
+      <button class="topbar-btn" title="Exportar relatório">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="content">
+    <div class="content-inner" id="appContent">
+
+      <div id="loadingState" style="text-align:center;padding:60px 0;color:var(--muted)">Carregando dados do plano...</div>
+
+    </div>
+  </div>
+</div>
+
+</div>
+
+<script>
+const API = window.location.port === '3001' ? '' : 'http://localhost:3001';
+
+const SECTION_ICONS = {
+  'Gerenciamento de Crises': `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--crisis)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
+  'Fluxos de Trabalho': `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>`,
+  'Porta-Vozes': `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`,
+  'Calendário de Eventos': `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`,
+  'Assuntos Sensíveis': `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--crisis)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`,
+  'Normativas': `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#06b6d4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>`,
+};
+
+const SECTION_COLORS = {
+  'Gerenciamento de Crises': { bg: 'var(--crisis-subtle)', bar: 'var(--success)', txt: 'var(--success)' },
+  'Fluxos de Trabalho': { bg: 'rgba(59,130,246,0.12)', bar: 'var(--success)', txt: 'var(--success)' },
+  'Porta-Vozes': { bg: 'var(--warning-subtle)', bar: 'var(--warning)', txt: 'var(--warning)' },
+  'Calendário de Eventos': { bg: 'var(--success-subtle)', bar: 'var(--success)', txt: 'var(--success)' },
+  'Assuntos Sensíveis': { bg: 'var(--crisis-subtle)', bar: 'var(--crisis)', txt: 'var(--crisis)' },
+  'Normativas': { bg: 'rgba(6,182,212,0.12)', bar: 'var(--success)', txt: 'var(--success)' },
+};
+
+function colorForScore(score) {
+  if (score >= 70) return { stroke: 'var(--success)', text: 'var(--success)' };
+  if (score >= 40) return { stroke: 'var(--warning)', text: 'var(--warning)' };
+  return { stroke: 'var(--crisis)', text: 'var(--crisis)' };
+}
+
+function statusForSection(covered, critical) {
+  if (covered) return { label: 'ok', bg: 'var(--success-subtle)', color: 'var(--success)' };
+  return critical
+    ? { label: 'crítico', bg: 'var(--crisis-subtle)', color: 'var(--crisis)' }
+    : { label: 'revisar', bg: 'var(--warning-subtle)', color: 'var(--warning)' };
+}
+
+function buildScoreHero(data) {
+  const c = colorForScore(data.score);
+  const circumference = 314;
+  const offset = circumference - (data.score / 100) * circumference;
+
+  return `
+    <div class="score-hero animate-in" style="animation-delay:0s">
+      <div class="score-ring">
+        <svg width="80" height="80" viewBox="0 0 120 120">
+          <circle cx="60" cy="60" r="50" fill="none" stroke="var(--border)" stroke-width="10"/>
+          <circle cx="60" cy="60" r="50" fill="none" stroke="${c.stroke}" stroke-width="10" stroke-dasharray="${circumference}" stroke-dashoffset="${offset}" stroke-linecap="round"/>
+        </svg>
+        <div class="score-ring-value" style="color:${c.text}">${data.score}%</div>
+      </div>
+      <div class="score-details">
+        <div style="font-size:1rem;font-weight:700;margin-bottom:4px">Saúde Geral do Plano</div>
+        ${data.sectionStatus.map(s => {
+          const sc = s.covered ? { bar: 'var(--success)', txt: 'var(--success)' } : (s.critical ? { bar: 'var(--crisis)', txt: 'var(--crisis)' } : { bar: 'var(--warning)', txt: 'var(--warning)' });
+          return `<div class="score-detail-row">
+            <span class="score-detail-label">${s.name.replace('Gerenciamento de Crises','Crises').replace('Calendário de Eventos','Calendário')}</span>
+            <div class="score-detail-bar"><div class="score-detail-fill" style="width:${s.covered ? 100 : 0}%;background:${sc.bar}"></div></div>
+            <span class="score-detail-val" style="color:${sc.txt}">${s.covered ? '100%' : '0%'}</span>
+          </div>`;
+        }).join('')}
+        <div class="score-meta">Score geral: ${data.score}% · ${data.totalDocuments} documento(s) · ${data.classifiedCount} classificado(s)</div>
+      </div>
+    </div>`;
+}
+
+function buildStatsGrid(data) {
+  return `
+    <div class="stats-grid">
+      <div class="stat-card animate-in">
+        <div class="stat-card-value" style="color:var(--accent)">${data.totalDocuments}</div>
+        <div class="stat-card-label">Documentos</div>
+      </div>
+      <div class="stat-card animate-in">
+        <div class="stat-card-value" style="color:var(--success)">${data.classificationRate}%</div>
+        <div class="stat-card-label">Classificados</div>
+      </div>
+      <div class="stat-card animate-in">
+        <div class="stat-card-value" style="color:var(--accent)">${data.sectionStatus.length}</div>
+        <div class="stat-card-label">Seções</div>
+      </div>
+      <div class="stat-card animate-in">
+        <div class="stat-card-value" style="color:${data.gaps.length > 0 ? 'var(--warning)' : 'var(--success)'}">${data.gaps.length}</div>
+        <div class="stat-card-label">Gaps</div>
+      </div>
+      <div class="stat-card animate-in">
+        <div class="stat-card-value" style="color:var(--success)">${data.classifiedCount}</div>
+        <div class="stat-card-label">Extraídos</div>
+      </div>
+      <div class="stat-card animate-in">
+        <div class="stat-card-value" style="color:var(--accent)">${data.outdatedCount}</div>
+        <div class="stat-card-label">Desatualizados</div>
+      </div>
+    </div>`;
+}
+
+function buildSectionRows(data) {
+  return `
+    <div style="font-size:0.72rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Cobertura por Seção</div>
+    ${data.sectionStatus.map(s => {
+      const st = statusForSection(s.covered, s.critical);
+      const colors = SECTION_COLORS[s.name] || { bg: 'var(--surface-2)', bar: 'var(--muted)', txt: 'var(--muted)' };
+      const icon = SECTION_ICONS[s.name] || '';
+      return `<div class="section-row animate-in">
+        <div class="section-row-icon" style="background:${colors.bg}">${icon}</div>
+        <div class="section-row-info">
+          <div class="section-row-title">${s.name}</div>
+          <div class="section-row-desc">${s.count} documento(s)</div>
+        </div>
+        <div class="section-row-bar">
+          <div class="section-row-bar-track"><div class="section-row-bar-fill" style="width:${s.covered ? 100 : 0}%;background:${st.color}"></div></div>
+        </div>
+        <span class="section-row-status" style="background:${st.bg};color:${st.color}">${st.label}</span>
+      </div>`;
+    }).join('')}`;
+}
+
+function buildGapCards(gaps) {
+  if (!gaps || gaps.length === 0) {
+    return `<div style="font-size:0.72rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin:20px 0 8px">Gaps Detectados</div>
+      <div style="text-align:center;padding:20px;color:var(--success);font-size:0.85rem">Nenhum gap detectado</div>`;
+  }
+
+  const gapIcons = {
+    critical: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--crisis)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/><circle cx="12" cy="12" r="10"/></svg>`,
+    warning: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
+  };
+
+  return `
+    <div style="font-size:0.72rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin:20px 0 8px">Gaps Detectados (${gaps.length})</div>
+    ${gaps.map((g, i) => {
+      const sev = g.severity === 'critical' ? 'critical' : 'warning';
+      const icon = gapIcons[sev] || gapIcons.warning;
+      return `<div class="gap-card animate-in">
+        <div class="gap-card-icon" style="background:${sev === 'critical' ? 'var(--crisis-subtle)' : 'var(--warning-subtle)'}">${icon}</div>
+        <div class="gap-card-info">
+          <div class="gap-card-title">${g.message || g.section}</div>
+          <div class="gap-card-desc">${g.docType ? 'Tipo: ' + g.docType : ''}${g.lastModified ? ' · Última mod.: ' + new Date(g.lastModified).toLocaleDateString('pt-BR') : ''}</div>
+        </div>
+        <button class="gap-card-action">${g.severity === 'critical' ? 'Revisar' : 'Verificar'}</button>
+      </div>`;
+    }).join('')}`;
+}
+
+async function loadHealth() {
+  const container = document.getElementById('appContent');
+
+  try {
+    const [healthRes, gapsRes] = await Promise.all([
+      fetch(API + '/api/plan/health'),
+      fetch(API + '/api/plan/gaps'),
+    ]);
+
+    if (!healthRes.ok) throw new Error('Erro ao carregar dados de saúde');
+    const health = await healthRes.json();
+
+    let detailedGaps = health.gaps || [];
+    if (gapsRes.ok) {
+      const gapsData = await gapsRes.json();
+      if (gapsData.gaps && gapsData.gaps.length > 0) {
+        detailedGaps = gapsData.gaps.map(g => ({
+          section: g.label || g.docType,
+          message: (g.type === 'missing' ? 'Seção "' + g.label + '" sem documentos' : 'Documento "' + g.name + '" desatualizado'),
+          severity: g.severity || 'warning',
+          docType: g.docType,
+          lastModified: g.lastModified,
+        }));
+      }
+    }
+
+    container.innerHTML =
+      buildScoreHero(health) +
+      buildStatsGrid(health) +
+      buildSectionRows(health) +
+      buildGapCards(detailedGaps);
+
+    document.getElementById('sidebarFooter').textContent =
+      health.totalDocuments + ' docs · online';
+
+    document.querySelectorAll('.animate-in').forEach((el, i) => {
+      el.style.animationDelay = (i * 0.06) + 's';
+    });
+
+  } catch (err) {
+    container.innerHTML = `
+      <div style="text-align:center;padding:60px 20px">
+        <div style="font-size:1.2rem;color:var(--crisis);margin-bottom:8px">Erro ao carregar dados</div>
+        <div style="font-size:0.78rem;color:var(--muted)">${err.message}</div>
+        <button onclick="loadHealth()" style="margin-top:16px;padding:8px 20px;border-radius:var(--radius-sm);border:none;background:var(--accent);color:#fff;font-family:var(--font);cursor:pointer">Tentar novamente</button>
+      </div>`;
+  }
+}
+
+document.addEventListener('DOMContentLoaded', loadHealth);
+</script>
+</body>
+</html>
