@@ -253,8 +253,20 @@ export const api = {
   queue: {
     status: (signal?: AbortSignal) => get<any>('/api/queue/status', signal),
     current: (signal?: AbortSignal) => get<any>('/api/queue/current', signal),
+    agents: (signal?: AbortSignal) => get<any>('/api/queue/agents', signal),
+    agentLogs: (params?: Record<string, string>, signal?: AbortSignal) =>
+      get<any>(`/api/queue/agent-logs?${new URLSearchParams(params || '').toString()}`, signal),
     start: () => post<any>('/api/queue/start', {}),
     pause: () => post<any>('/api/queue/pause', {}),
     resume: () => post<any>('/api/queue/resume', {}),
+  },
+  siteAgents: {
+    list: (signal?: AbortSignal) => get<any>('/api/site-agents', signal),
+    snapshots: (params?: Record<string, string>, signal?: AbortSignal) =>
+      get<any>(`/api/site-agents/snapshots?${new URLSearchParams(params || '').toString()}`, signal),
+    byArea: (area: string, signal?: AbortSignal) => get<any>(`/api/site-agents/snapshots/${encodeURIComponent(area)}`, signal),
+    byPage: (area: string, page: string, signal?: AbortSignal) =>
+      get<any>(`/api/site-agents/snapshots/${encodeURIComponent(area)}/${encodeURIComponent(page)}`, signal),
+    run: (agents?: string[]) => post<any>('/api/site-agents/run', agents ? { agents } : {}),
   },
 }
