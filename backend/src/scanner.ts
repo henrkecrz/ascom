@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
-import { initDatabase, insertFile, saveDatabase, getDatabase, storeFileBlob, getSetting, flushDatabase, deleteFile, getFilesBySource } from './database';
+import { initDatabase, insertFile, saveDatabase, getDatabase, storeFileBlob, getSetting, flushDatabase, deleteFile, getFilesBySource, upsertSourceFileState } from './database';
 import { getAllDataSources, updateLastScanned } from './db/dataSources';
 import { importFile } from './analysis/smartImporter';
 import { logger } from './lib/logger';
@@ -64,7 +64,7 @@ function computeMd5(filePath: string): Promise<string> {
     const hash = crypto.createHash('md5');
     const stream = fs.createReadStream(filePath);
     stream.on('data', (data) => hash.update(data));
-    stream.on('end', () => resolve(hash.digest('hex')));
+    stream.on('end', () => resolve(hash.digest('hex'));
     stream.on('error', reject);
   });
 }
@@ -104,22 +104,28 @@ async function scanDirectory(dirPath: string, rootDir: string, rootLabel: string
         const md5Hash = await computeMd5(fullPath);
 
         const db = getDatabase();
-        const existing = db.prepare('SELECT id, md5_hash FROM files WHERE full_path = ?');
-        existing.bind([fullPath]);
+        const existing = db.prepare('SELECT id, md5_hash, full_path FROM files WHERE full_path = ? OR id IN (SELECT file_id FROM source_file_state WHERE source_path = ?) LIMIT 1');
+        existing.bind([fullPath, fullPath]);
         const exists = existing.step();
-        const existingId = exists ? Number(existing.getAsObject().id) : null;
-        const existingHash = exists ? String(existing.getAsObject().md5_hash || '') : '';
+        const existingObj = exists ? existing.getAsObject() as any : null;
+        const existingId = exists ? Number(existingObj.id) : null;
+        const existingHash = exists ? String(existingObj.md5_hash || '') : '';
         existing.free();
 
         if (existingId) {
+          let cachedPath: string | null = null;
+          if (sourceId && ext && IMPORTABLE_EXTENSIONS.has(ext)) {
+            cachedPath = copyToCache(fullPath, relativePath, sourceId);
+          }
           if (existingHash !== md5Hash) {
             db.run(`UPDATE files SET name=?, full_path=?, relative_path=?, extension=?, size_bytes=?, size_formatted=?, last_modified=?, category=?, parent_folder=?, depth=?, md5_hash=?, source_id=?
                      WHERE id=?`,
-              [entry.name, fullPath, relativePath, ext, stats.size, sizeFormatted, lastModified, category, parentFolder, depth, md5Hash, sourceId, existingId]);
+              [entry.name, cachedPath || fullPath, relativePath, ext, stats.size, sizeFormatted, lastModified, category, parentFolder, depth, md5Hash, sourceId, existingId]);
             enqueueFile(existingId, 0);
             counters.modifiedCount++;
             logger.info(`  🔄 Modificado: ${entry.name}`);
           }
+          upsertSourceFileState({ fileId: existingId, sourceId, sourcePath: fullPath, cachePath: cachedPath || '', md5Hash, lastModified, exists: true });
         } else {
           const fileId = insertFile({
             name: entry.name,
@@ -146,6 +152,7 @@ async function scanDirectory(dirPath: string, rootDir: string, rootLabel: string
                 db.run('UPDATE files SET full_path = ? WHERE id = ?', [cachedPath, fileId]);
               }
             }
+            upsertSourceFileState({ fileId, sourceId, sourcePath: fullPath, cachePath: cachedPath || '', md5Hash, lastModified, exists: true });
 
             if (storeBlobs && ext && STORABLE_EXTENSIONS.has(ext) && stats.size <= MAX_BLOB_SIZE) {
               try {
@@ -231,11 +238,16 @@ export async function runScan(): Promise<void> {
 
       let removedCount = 0;
       for (const [dbPath, fileId] of dbFiles) {
-        if (!currentPaths.has(dbPath)) {
+        const srcStmt = db.prepare('SELECT source_path FROM source_file_state WHERE file_id = ? LIMIT 1');
+        srcStmt.bind([fileId]);
+        const sourcePath = srcStmt.step() ? String(srcStmt.getAsObject().source_path || dbPath) : dbPath;
+        srcStmt.free();
+        if (!currentPaths.has(sourcePath)) {
           const fileStmt = db.prepare('SELECT name FROM files WHERE id = ?');
           fileStmt.bind([fileId]);
           const name = fileStmt.step() ? String(fileStmt.getAsObject().name) : 'desconhecido';
           fileStmt.free();
+          upsertSourceFileState({ fileId, sourceId: source.id, sourcePath, exists: false });
           deleteFile(fileId);
           removedCount++;
           logger.info(`  🗑️ Removido: ${name} (não encontrado em disco)`);
