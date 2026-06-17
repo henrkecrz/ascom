@@ -121,3 +121,35 @@ export {
   getImportHistoryById,
   ImportHistoryRecord
 } from './db/importHistory';
+
+export {
+  ensureIntelligenceTables,
+  createDocumentVersion,
+  createChangeEventFromVersions,
+  getLatestDocumentVersion,
+  listDocumentVersions,
+  getDocumentVersion,
+  getVersionDiff,
+  listDocumentChanges,
+  listDocumentChangesByFile,
+  getDocumentChange,
+  updateDocumentChangeStatus,
+  listDocumentChangeAlerts,
+  resolveDocumentChangeAlert,
+  upsertSourceFileState,
+  createCalendarEvent,
+  listCalendarEvents,
+  createCalendarOpportunity,
+  listCalendarOpportunities,
+  addPhotoTag,
+  listPhotoTags,
+  deletePhotoTag,
+  recordPhotoUsage,
+  listPhotoUsage,
+  listUnusedPhotos,
+  createPhotoHighlight,
+  listPhotoHighlights,
+  getDayIntelligence,
+  DocumentVersion,
+  DocumentChangeEvent
+} from './db/intelligence';
