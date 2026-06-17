@@ -11,6 +11,7 @@ import { importUnifiedStructured } from './processors/unifiedImporter';
 import { processDocxIntelligently } from './processors/docxStructureExtractor';
 import { generateScenarios, generateScenarioFromDocuments, generateTalkingPoints } from './services/simulatorAi';
 import { insertScenario, getScenarioCategories, insertTalkingPoint, getTalkingPoints } from './database';
+import { executeQueueAgentStage } from './queueAgents/queueAgentOrchestrator';
 import { logger } from './lib/logger';
 
 const STAGE_TIMEOUT = 120000;
@@ -130,7 +131,7 @@ async function processItem(item: QueueItem, signal: AbortSignal): Promise<void> 
   const fileId = item.file_id;
 
   if (fileId === 0) {
-    await processGlobalStage(stage, signal);
+    await executeQueueAgentStage(item, { signal }, () => processGlobalStage(stage, signal));
     return;
   }
 
@@ -142,13 +143,16 @@ async function processItem(item: QueueItem, signal: AbortSignal): Promise<void> 
 
   switch (stage) {
     case 'extract':
-      await processExtract(doc, signal);
+      await executeQueueAgentStage(item, { file: doc, signal }, () => processExtract(doc, signal));
       break;
     case 'analyze':
-      await processAnalyze(doc, signal);
+      await executeQueueAgentStage(item, { file: doc, signal }, () => processAnalyze(doc, signal));
+      break;
+    case 'risk':
+      await executeQueueAgentStage(item, { file: doc, signal }, async () => undefined);
       break;
     case 'structure':
-      await processStructure(doc, signal);
+      await executeQueueAgentStage(item, { file: doc, signal }, () => processStructure(doc, signal));
       break;
     default:
       completeItem(item.id, 'skipped', `Estágio desconhecido: ${stage}`);
