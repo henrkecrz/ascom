@@ -1,6 +1,7 @@
-import { getDatabase, getSetting } from '../database';
+import { getDatabase } from '../database';
 import { logger } from '../lib/logger';
 import { rankDocumentsByQuery } from '../analysis/semanticSearch';
+import { callScopedLLM } from './aiProfile';
 import natural from 'natural';
 
 const tokenizer = new natural.WordTokenizer();
@@ -28,15 +29,11 @@ export const QUICK_ANSWERS = [
 function detectIntent(question: string): { intent: string; terms: string[] } {
   const tokens = tokenizer.tokenize(question.toLowerCase()) || [];
   const meaningful = tokens.filter(t => t.length > 2);
-
   for (const rule of INTENT_PATTERNS) {
     for (const pattern of rule.patterns) {
-      if (pattern.test(question)) {
-        return { intent: rule.intent, terms: meaningful };
-      }
+      if (pattern.test(question)) return { intent: rule.intent, terms: meaningful };
     }
   }
-
   return { intent: 'buscar', terms: meaningful };
 }
 
@@ -62,9 +59,8 @@ function searchRelevantDocs(db: any, terms: string[], question: string, docType?
     return [];
   }
 
-  const typeFilter = docType ? "AND f.doc_type = ?" : "";
+  const typeFilter = docType ? 'AND f.doc_type = ?' : '';
   const typeParams = docType ? [docType] : [];
-
   const likeClauses = terms.map(() => "(f.name LIKE ? OR COALESCE(ds.summary, '') LIKE ? OR COALESCE(ds.keywords, '') LIKE ? OR COALESCE(f.plan_section, '') LIKE ? OR COALESCE(dt.raw_text, '') LIKE ?)").join(' OR ');
   const likeParams: string[] = [];
   for (const term of terms) {
@@ -73,7 +69,6 @@ function searchRelevantDocs(db: any, terms: string[], question: string, docType?
   }
 
   const results: any[] = [];
-
   const trySearch = (whereClause: string, params: any[]) => {
     const stmt = db.prepare(`
       SELECT f.id, f.name, f.extension, f.doc_type, f.doc_type_confidence, f.plan_section,
@@ -92,9 +87,7 @@ function searchRelevantDocs(db: any, terms: string[], question: string, docType?
 
   trySearch(`${likeClauses} ${typeFilter}`, [...likeParams, ...typeParams]);
 
-  if (results.length === 0 && docType) {
-    trySearch(`f.doc_type = ?`, [docType]);
-  }
+  if (results.length === 0 && docType) trySearch('f.doc_type = ?', [docType]);
 
   if (results.length === 0 && terms.length > 0) {
     const stmt = db.prepare(`
@@ -113,7 +106,6 @@ function searchRelevantDocs(db: any, terms: string[], question: string, docType?
     stmt.free();
     if (allDocs.length > 0) {
       const ranked = rankDocumentsByQuery(question, allDocs.map(d => ({ id: Number(d.id), text: String(d.raw_text || '') + ' ' + String(d.name || '') }))).slice(0, limit);
-      const ids = new Set(ranked.map(r => r.id));
       return ranked.map(r => rowToResult(allDocs.find((d: any) => Number(d.id) === r.id) || allDocs[0]));
     }
   }
@@ -138,46 +130,23 @@ function rowToResult(row: any) {
 
 function buildResponse(intent: string, docs: any[], question: string): any {
   if (docs.length === 0) {
-    return {
-      answer: 'Não encontrei documentos relacionados à sua pergunta. Tente reformular ou buscar por termos mais específicos.',
-      documents: [],
-    };
+    return { answer: 'Não encontrei documentos relacionados à sua pergunta. Tente reformular ou buscar por termos mais específicos.', documents: [] };
   }
-
-  const docList = docs.map((d: any, i: number) =>
-    `${i + 1}. **${d.name}** (${d.docType}) — ${d.summary?.substring(0, 120) || 'sem resumo'}`
-  ).join('\n');
-
+  const docList = docs.map((d: any, i: number) => `${i + 1}. **${d.name}** (${d.docType}) — ${d.summary?.substring(0, 120) || 'sem resumo'}`).join('\n');
   let answer = '';
   switch (intent) {
-    case 'qual_protocolo':
-      answer = `📋 **Protocolos encontrados:**\n\n${docList}\n\n*Clique em um documento para ver os detalhes completos do protocolo.*`;
-      break;
+    case 'qual_protocolo': answer = `📋 **Protocolos encontrados:**\n\n${docList}\n\n*Clique em um documento para ver os detalhes completos do protocolo.*`; break;
     case 'quem_eh': {
       const spokes = docs.filter(d => d.docType === 'porta_voz');
-      if (spokes.length > 0) {
-        answer = `🎤 **Porta-Vozes encontrados:**\n\n${spokes.map((d: any) => `• ${d.name}`).join('\n')}`;
-      } else {
-        answer = `📄 **Documentos relacionados:**\n\n${docList}`;
-      }
+      answer = spokes.length > 0 ? `🎤 **Porta-Vozes encontrados:**\n\n${spokes.map((d: any) => `• ${d.name}`).join('\n')}` : `📄 **Documentos relacionados:**\n\n${docList}`;
       break;
     }
-    case 'calendario':
-      answer = `📅 **Eventos e calendários encontrados:**\n\n${docList}`;
-      break;
-    case 'listar':
-      answer = `📚 **Documentos encontrados (${docs.length}):**\n\n${docList}`;
-      break;
-    case 'resumir':
-      answer = `📝 **Resumo dos documentos encontrados:**\n\n${docList}`;
-      break;
-    case 'atualizacao':
-      answer = `🕐 **Documentos recentes e atualizados:**\n\n${docList}`;
-      break;
-    default:
-      answer = `🔍 **Resultados da busca:**\n\n${docList}`;
+    case 'calendario': answer = `📅 **Eventos e calendários encontrados:**\n\n${docList}`; break;
+    case 'listar': answer = `📚 **Documentos encontrados (${docs.length}):**\n\n${docList}`; break;
+    case 'resumir': answer = `📝 **Resumo dos documentos encontrados:**\n\n${docList}`; break;
+    case 'atualizacao': answer = `🕐 **Documentos recentes e atualizados:**\n\n${docList}`; break;
+    default: answer = `🔍 **Resultados da busca:**\n\n${docList}`;
   }
-
   return { answer, documents: docs.slice(0, 10) };
 }
 
@@ -190,7 +159,6 @@ export async function processQuestion(question: string) {
   if (!db) throw new Error('Banco não inicializado');
 
   const { intent, terms } = detectIntent(question);
-
   let docTypeFilter: string | undefined;
   if (/crise|protocolo|emergência/i.test(question)) docTypeFilter = 'protocolo_crise';
   else if (/porta[- ]?voz|quem fala/i.test(question)) docTypeFilter = 'porta_voz';
@@ -203,29 +171,11 @@ export async function processQuestion(question: string) {
   else if (/clipping|monitoramento|imprensa/i.test(question)) docTypeFilter = 'clipping_monitoramento';
 
   let docs = searchRelevantDocs(db, terms, question, docTypeFilter);
-
-  if (docs.length === 0 && docTypeFilter) {
-    docs = searchRelevantDocs(db, terms, question, undefined);
-  }
-
-  if (docs.length === 0) {
-    const fallback = buildResponse(intent, docs, question);
-    return { intent, ...fallback, source: 'local_ml_fallback' };
-  }
-
-  const encryptedKey = getSetting('ai_api_key');
-  const apiKey = encryptedKey ? require('../lib/crypto').decrypt(encryptedKey) : '';
-  const baseUrl = (getSetting('ai_base_url') || 'https://opencode.ai/zen/v1').replace(/\/+$/, '');
-  const rawModel = getSetting('ai_model') || 'opencode/deepseek-v4-flash-free';
-  const model = rawModel.replace(/^[^/]+\//, '');
-  const potency = getSetting('ai_potency') || '0.7';
-  const isFreeProvider = !apiKey || apiKey.trim().length <= 5;
+  if (docs.length === 0 && docTypeFilter) docs = searchRelevantDocs(db, terms, question, undefined);
+  if (docs.length === 0) return { intent, ...buildResponse(intent, docs, question), source: 'local_ml_fallback' };
 
   try {
-    const contextText = docs.map((d, i) =>
-      `[Doc ${i + 1}] Nome: ${d.name}\nSeção: ${d.planSection || 'Geral'}\nResumo: ${d.summary || 'Sem resumo'}\nConteúdo: ${d.rawText ? d.rawText.substring(0, 1200) : 'Sem conteúdo'}`
-    ).join('\n\n');
-
+    const contextText = docs.map((d, i) => `[Doc ${i + 1}] Nome: ${d.name}\nSeção: ${d.planSection || 'Geral'}\nResumo: ${d.summary || 'Sem resumo'}\nConteúdo: ${d.rawText ? d.rawText.substring(0, 1200) : 'Sem conteúdo'}`).join('\n\n');
     const systemPrompt = `Você é o assistente inteligente da ASCOM (Assessoria de Comunicação) da Novacap.
 Sua tarefa é responder a dúvidas operacionais de jornalistas e assessores de imprensa com base exclusivamente nos documentos de referência do Plano de Comunicação fornecidos abaixo.
 Seja conciso, profissional, claro e objetivo. Em caso de crises, indique sempre o porta-voz autorizado e o protocolo pré-validado.
@@ -233,40 +183,16 @@ Seja conciso, profissional, claro e objetivo. Em caso de crises, indique sempre 
 DOCUMENTOS DE REFERÊNCIA:
 ${contextText}`;
 
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (!isFreeProvider) headers['Authorization'] = `Bearer ${apiKey}`;
+    const answer = await callScopedLLM('interactive_agents', [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: question },
+    ], { timeoutMs: 25000 });
 
-    const response = await fetch(`${baseUrl}/chat/completions`, {
-      method: 'POST',
-      signal: AbortSignal.timeout(25000),
-      headers,
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: question }
-        ],
-        temperature: parseFloat(potency)
-      })
-    });
-
-    if (!response.ok) {
-      throw new Error(`Erro na API: ${response.status} ${response.statusText}`);
-    }
-
-    const data = await response.json() as any;
-    const answer = data.choices?.[0]?.message?.content || 'Não foi possível extrair uma resposta do modelo.';
-
-    return {
-      intent,
-      answer,
-      documents: docs.slice(0, 10),
-      source: `opencode_ai (${model})`
-    };
+    if (!answer) throw new Error('Resposta vazia do perfil interactive_agents');
+    return { intent, answer, documents: docs.slice(0, 10), source: 'interactive_agents' };
   } catch (e: any) {
     logger.warn('Falha ao utilizar IA, usando fallback local', { message: e.message });
   }
 
-  const fallback = buildResponse(intent, docs, question);
-  return { intent, ...fallback, source: 'local_ml_fallback' };
+  return { intent, ...buildResponse(intent, docs, question), source: 'local_ml_fallback' };
 }
