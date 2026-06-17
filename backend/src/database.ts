@@ -100,6 +100,8 @@ export {
   getScenarios,
   getScenarioCategories,
   deleteScenario,
+  reclassifyAllScenarios,
+  classifyScenarioText,
   Scenario,
   ScenarioOption
 } from './db/simulator';

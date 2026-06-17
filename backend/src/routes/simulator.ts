@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { getScenarios, getScenarioCategories, insertScenario } from '../database';
+import { getScenarios, getScenarioCategories, insertScenario, reclassifyAllScenarios } from '../database';
 import { logger } from '../lib/logger';
 
 const router = Router();
@@ -35,4 +35,16 @@ router.post('/api/simulator/evaluate', (req: Request, res: Response) => {
   });
 });
 
+router.post('/api/simulator/reclassify', (_req: Request, res: Response) => {
+  try {
+    const result = reclassifyAllScenarios();
+    logger.info('Reclassificação de cenários concluída', result);
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    logger.error('Erro ao reclassificar cenários', { error: err.message });
+    res.status(500).json({ error: err.message || 'Erro ao reclassificar' });
+  }
+});
+
 export default router;
+

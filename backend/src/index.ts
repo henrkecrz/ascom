@@ -2,7 +2,7 @@ import dotenv from 'dotenv'; dotenv.config({ override: true });
 import express from 'express';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
-import { initDatabase, getDatabase, flushDatabase } from './database';
+import { initDatabase, getDatabase, flushDatabase, reclassifyAllScenarios } from './database';
 import { startModelCache } from './services/modelCache';
 import { authMiddleware, loginHandler } from './middleware/auth';
 import { ensureQueueTable, enqueueAllFiles, enqueueGlobalStages } from './queue';
@@ -94,6 +94,16 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 async function main() {
   await initDatabase();
   ensureQueueTable();
+
+  // Auto-reclassify simulator scenarios on startup
+  try {
+    const reclassResult = reclassifyAllScenarios();
+    if (reclassResult.updated > 0) {
+      logger.info('Cenários do simulador reclassificados no startup', reclassResult);
+    }
+  } catch (e: any) {
+    logger.warn('Falha ao reclassificar cenários', { error: e.message });
+  }
 
   // Enfileira documentos não processados e estágios globais
   const total = enqueueAllFiles();
