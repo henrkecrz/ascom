@@ -58,6 +58,19 @@ function storedCredential(scope?: string): string {
   try { return decrypt(encrypted); } catch { return ''; }
 }
 
+function sanitizeProfilesForSettings(): any {
+  const profiles: any = getAIProfiles();
+  const scopes = [
+    ['interactive_agents', 'ai_interactive'],
+    ['queue_agents', 'ai_queue'],
+    ['site_agents', 'ai_site'],
+  ];
+  for (const [scope, prefix] of scopes) {
+    if (profiles[scope] && !getSetting(`${prefix}_model`)) profiles[scope].model = '';
+  }
+  return profiles;
+}
+
 async function fetchModelsForSettings(providerInput: string, baseUrlInput?: string, scope?: string, providedCredential?: string): Promise<{ models: string[]; error?: string }> {
   const provider = normalizeProvider(providerInput);
   const config = getProviderConfig(provider);
@@ -101,7 +114,7 @@ router.get('/api/settings', (_req: Request, res: Response) => {
     ai_model: getSetting('ai_model') || '',
     ai_potency: getSetting('ai_potency') || '0.7',
     store_original_files: getSetting('store_original_files') || 'true',
-    ai_profiles: getAIProfiles(),
+    ai_profiles: sanitizeProfilesForSettings(),
     providers: listProviders(),
   });
 });
@@ -122,13 +135,13 @@ router.post('/api/settings', (req: Request, res: Response) => {
 });
 
 router.get('/api/settings/ai-profiles', (_req: Request, res: Response) => {
-  res.json({ profiles: getAIProfiles(), providers: listProviders() });
+  res.json({ profiles: sanitizeProfilesForSettings(), providers: listProviders() });
 });
 
 router.post('/api/settings/ai-profiles', (req: Request, res: Response) => {
   const profiles = req.body?.profiles || {};
   saveAIProfiles(profiles);
-  res.json({ success: true, profiles: getAIProfiles(), providers: listProviders() });
+  res.json({ success: true, profiles: sanitizeProfilesForSettings(), providers: listProviders() });
 });
 
 router.post('/api/settings/ai-profiles/test', async (req: Request, res: Response) => {
