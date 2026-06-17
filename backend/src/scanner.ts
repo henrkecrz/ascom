@@ -1,9 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
-import { initDatabase, insertFile, saveDatabase, getDatabase, storeFileBlob, getSetting, flushDatabase, deleteFile, getFilesBySource, upsertSourceFileState } from './database';
+import { initDatabase, insertFile, getDatabase, storeFileBlob, getSetting, flushDatabase, deleteFile, getFilesBySource, upsertSourceFileState, ensureIntelligenceTables } from './database';
 import { getAllDataSources, updateLastScanned } from './db/dataSources';
-import { importFile } from './analysis/smartImporter';
 import { logger } from './lib/logger';
 import { enqueueFile, enqueueGlobalStages } from './queue';
 
@@ -186,6 +185,7 @@ export async function runScan(): Promise<void> {
 
   try {
     await initDatabase();
+    ensureIntelligenceTables();
     const sources = getAllDataSources(true).filter(s => s.type === 'documentos');
 
     if (sources.length === 0) {
