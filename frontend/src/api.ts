@@ -169,9 +169,13 @@ export const api = {
   settings: {
     get: (signal?: AbortSignal) => get<any>('/api/settings', signal),
     save: (data: any) => post<any>('/api/settings', data),
-    models: (apiKey?: string, baseUrl?: string, signal?: AbortSignal) =>
-      get<any>(`/api/settings/models?${new URLSearchParams({ apiKey: apiKey || '', baseUrl: baseUrl || '' })}`, signal),
-    testModel: (data: { api_key: string; base_url: string; model: string }) =>
+    providers: (signal?: AbortSignal) => get<any>('/api/settings/providers', signal),
+    aiProfiles: (signal?: AbortSignal) => get<any>('/api/settings/ai-profiles', signal),
+    saveAIProfiles: (profiles: any) => post<any>('/api/settings/ai-profiles', { profiles }),
+    providerModels: (data: { provider: string; baseUrl?: string; credential?: string }) => post<any>('/api/settings/provider-models', data),
+    models: (provider?: string, baseUrl?: string, signal?: AbortSignal) =>
+      get<any>(`/api/settings/models?${new URLSearchParams({ provider: provider || 'opencode', baseUrl: baseUrl || '' })}`, signal),
+    testModel: (data: { api_key?: string; base_url: string; model: string; provider?: string }) =>
       post<any>('/api/settings/test-model', data),
   },
   structuredData: {
