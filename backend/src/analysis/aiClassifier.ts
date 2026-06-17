@@ -1,6 +1,5 @@
-import { getSetting } from '../database';
-import { decrypt } from '../lib/crypto';
 import { logger } from '../lib/logger';
+import { callScopedLLM } from '../services/aiProfile';
 import { classifyDocument as regexClassify, DocType, ClassificationResult, getDocTypeLabel } from './classifier';
 
 interface AIClassificationResult extends ClassificationResult {
@@ -47,9 +46,10 @@ function extractSectionName(docType: string): string {
 
 function parseAIResponse(text: string): AIClassificationResult | null {
   try {
-    const jsonMatch = text.match(/\{[\s\S]*"docType"[\s\S]*\}/);
-    if (!jsonMatch) return null;
-    const parsed = JSON.parse(jsonMatch[0]);
+    const start = text.indexOf('{');
+    const end = text.lastIndexOf('}');
+    if (start < 0 || end <= start) return null;
+    const parsed = JSON.parse(text.slice(start, end + 1));
     if (parsed.docType && parsed.confidence !== undefined) {
       return {
         docType: parsed.docType as DocType,
@@ -67,65 +67,31 @@ export async function classifyWithAI(
   text: string,
   category: string
 ): Promise<AIClassificationResult> {
-  const encryptedKey = getSetting('ai_api_key');
-  const apiKey = encryptedKey ? decrypt(encryptedKey) : '';
-  const baseUrl = (getSetting('ai_base_url') || 'https://opencode.ai/zen/v1').replace(/\/+$/, '');
-  const model = (getSetting('ai_model') || 'opencode/deepseek-v4-flash-free').replace(/^[^/]+\//, '');
-
-  const hasValidKey = apiKey && apiKey.trim().length > 5;
-
   const fallback = (): AIClassificationResult => {
     const regex = regexClassify(name, text, category);
     return { ...regex, source: 'regex' };
   };
 
-  // Expand text window up to 60k chars to take advantage of opencode 200k tokens
   const corpus = text.substring(0, 60000);
 
   try {
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (hasValidKey) headers['Authorization'] = `Bearer ${apiKey}`;
+    const content = await callScopedLLM('queue_agents', [
+      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'user', content: `Nome do arquivo: ${name}\nCategoria: ${category}\n\nConteúdo do documento:\n${corpus}` },
+    ], { temperature: 0.1, maxTokens: 150, timeoutMs: 15000 });
 
-    const response = await fetch(`${baseUrl}/chat/completions`, {
-      method: 'POST',
-      signal: AbortSignal.timeout(15000),
-      headers,
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          {
-            role: 'user',
-            content: `Nome do arquivo: ${name}\nCategoria: ${category}\n\nConteúdo do documento:\n${corpus}`,
-          },
-        ],
-        temperature: 0.1,
-        max_tokens: 150,
-      }),
-    });
-
-    if (!response.ok) {
-      logger.warn(`AI classifier API error, falling back to regex`, { status: response.status });
-      return fallback();
-    }
-
-    const data = await response.json() as any;
-    const content = data.choices?.[0]?.message?.content;
     if (!content) return fallback();
 
     const aiResult = parseAIResponse(content);
     if (!aiResult) return fallback();
 
     const regexResult = regexClassify(name, text, category);
-
-    const result: AIClassificationResult = {
+    return {
       docType: aiResult.confidence >= 0.6 ? aiResult.docType : regexResult.docType,
       confidence: aiResult.confidence >= 0.6 ? aiResult.confidence : regexResult.confidence * 0.8,
       planSection: aiResult.confidence >= 0.6 ? aiResult.planSection : regexResult.planSection,
       source: aiResult.confidence >= 0.6 ? 'ai' : 'hybrid',
     };
-
-    return result;
   } catch (e: any) {
     logger.warn('AI classifier error, falling back to regex', { message: e.message });
     return fallback();
