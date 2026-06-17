@@ -1,10 +1,14 @@
+import { calendarIntelligenceAgent } from './calendarIntelligenceAgent';
 import { crisisReadinessAgent } from './crisisReadinessAgent';
 import { dataQualityAgent } from './dataQualityAgent';
+import { documentChangeAgent } from './documentChangeAgent';
 import { draftPreparationAgent } from './draftPreparationAgent';
 import { essentialAlertsAgent } from './essentialAlertsAgent';
 import { essentialOverviewAgent } from './essentialOverviewAgent';
+import { galleryContextAgent } from './galleryContextAgent';
 import { graphEnrichmentAgent } from './graphEnrichmentAgent';
 import { planCoverageAgent } from './planCoverageAgent';
+import { sourceSyncAgent } from './sourceSyncAgent';
 import { SiteAgentDefinition } from './types';
 
 export const siteAgentRegistry: SiteAgentDefinition[] = [
@@ -23,6 +27,20 @@ export const siteAgentRegistry: SiteAgentDefinition[] = [
     handler: essentialAlertsAgent,
   },
   {
+    id: 'documentChangeAgent',
+    label: 'Mudanças documentais',
+    area: 'essencial',
+    pages: ['mudancas', 'dashboard'],
+    handler: documentChangeAgent,
+  },
+  {
+    id: 'sourceSyncAgent',
+    label: 'Sincronização das fontes',
+    area: 'essencial',
+    pages: ['fontes', 'dashboard'],
+    handler: sourceSyncAgent,
+  },
+  {
     id: 'crisisReadinessAgent',
     label: 'Prontidão de crise',
     area: 'essencial',
@@ -35,6 +53,13 @@ export const siteAgentRegistry: SiteAgentDefinition[] = [
     area: 'ferramentas',
     pages: ['generator'],
     handler: draftPreparationAgent,
+  },
+  {
+    id: 'calendarIntelligenceAgent',
+    label: 'Calendário inteligente',
+    area: 'ferramentas',
+    pages: ['calendario'],
+    handler: calendarIntelligenceAgent,
   },
   {
     id: 'dataQualityAgent',
@@ -56,6 +81,13 @@ export const siteAgentRegistry: SiteAgentDefinition[] = [
     area: 'dados',
     pages: ['plan'],
     handler: planCoverageAgent,
+  },
+  {
+    id: 'galleryContextAgent',
+    label: 'Galeria inteligente',
+    area: 'dados',
+    pages: ['galeria'],
+    handler: galleryContextAgent,
   },
 ];
 
