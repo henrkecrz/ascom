@@ -30,6 +30,9 @@ type Profile = {
   enabled: boolean
   maxConcurrency: number
   fallbackUsed?: boolean
+  availableModels?: string[]
+  modelsUpdatedAt?: string
+  modelsError?: string
 }
 
 const PROFILE_ORDER: Scope[] = ['interactive_agents', 'queue_agents', 'site_agents']
@@ -78,6 +81,9 @@ function defaultProfile(scope: Scope): Profile {
     potency: defaults[scope].potency || 0.3,
     enabled: true,
     maxConcurrency: defaults[scope].maxConcurrency || 1,
+    availableModels: [],
+    modelsUpdatedAt: '',
+    modelsError: '',
   }
 }
 
@@ -123,12 +129,17 @@ export function Settings() {
         credential: profile.credential || undefined,
       })
       const models = Array.isArray(res?.models) ? res.models : []
+      const error = res?.error ? String(res.error) : ''
+      const updatedAt = new Date().toISOString()
       setModelOptions(prev => ({ ...prev, [scope]: models }))
-      if (res?.error) setModelErrors(prev => ({ ...prev, [scope]: String(res.error) }))
+      setModelErrors(prev => ({ ...prev, [scope]: error || undefined }))
+      setProfiles(prev => ({ ...prev, [scope]: { ...prev[scope], availableModels: models, modelsUpdatedAt: updatedAt, modelsError: error } }))
     } catch (e: any) {
+      const error = e.message || 'Erro ao carregar modelos reais do provedor.'
       console.error(e)
       setModelOptions(prev => ({ ...prev, [scope]: [] }))
-      setModelErrors(prev => ({ ...prev, [scope]: e.message || 'Erro ao carregar modelos reais do provedor.' }))
+      setModelErrors(prev => ({ ...prev, [scope]: error }))
+      setProfiles(prev => ({ ...prev, [scope]: { ...prev[scope], availableModels: [], modelsUpdatedAt: new Date().toISOString(), modelsError: error } }))
     } finally {
       setLoadingModels(prev => ({ ...prev, [scope]: false }))
     }
@@ -146,9 +157,13 @@ export function Settings() {
       setProviders(providerList)
       const incoming = profileData?.profiles || settingsData?.ai_profiles || {}
       const next = { ...profiles }
+      const nextModels: Record<Scope, string[]> = { interactive_agents: [], queue_agents: [], site_agents: [] }
+      const nextErrors: Record<string, string | undefined> = {}
       for (const scope of PROFILE_ORDER) {
         const profileProvider = incoming[scope]?.provider || 'opencode'
         const providerConfig = providerList.find((p: ProviderConfig) => p.id === profileProvider) || FALLBACK_PROVIDERS.find(p => p.id === profileProvider) || FALLBACK_PROVIDERS[2]
+        const savedModels = Array.isArray(incoming[scope]?.availableModels) ? incoming[scope].availableModels : []
+        const savedError = incoming[scope]?.modelsError || ''
         next[scope] = {
           ...defaultProfile(scope),
           ...(incoming[scope] || {}),
@@ -156,12 +171,16 @@ export function Settings() {
           baseUrl: incoming[scope]?.baseUrl || providerConfig.baseUrl,
           model: incoming[scope]?.model || '',
           credential: '',
+          availableModels: savedModels,
+          modelsUpdatedAt: incoming[scope]?.modelsUpdatedAt || '',
+          modelsError: savedError,
         }
+        nextModels[scope] = savedModels
+        nextErrors[scope] = savedError || undefined
       }
       setProfiles(next)
-      for (const scope of PROFILE_ORDER) {
-        loadModelsForProfile(scope, next[scope])
-      }
+      setModelOptions(nextModels)
+      setModelErrors(nextErrors)
     } catch (e) {
       console.error(e)
       setStatusMessage({ type: 'error', text: 'Erro ao carregar configurações de IA.' })
@@ -182,6 +201,9 @@ export function Settings() {
       baseUrl: provider.baseUrl,
       model: '',
       credential: profiles[scope].credential || '',
+      availableModels: [],
+      modelsUpdatedAt: '',
+      modelsError: '',
     }
     setProfiles(prev => ({ ...prev, [scope]: nextProfile }))
     setModelOptions(prev => ({ ...prev, [scope]: [] }))
@@ -204,6 +226,9 @@ export function Settings() {
           potency: profile.potency,
           enabled: profile.enabled,
           maxConcurrency: profile.maxConcurrency,
+          availableModels: modelOptions[scope] || profile.availableModels || [],
+          modelsUpdatedAt: profile.modelsUpdatedAt || '',
+          modelsError: modelErrors[scope] || profile.modelsError || '',
         }
         if (profile.credential && profile.credential.trim().length > 0) {
           payload.profiles[scope].credential = profile.credential.trim()
@@ -211,11 +236,11 @@ export function Settings() {
       }
       await api.post('/api/settings/ai-profiles', payload)
       await api.settings.save({ store_original_files: storeOriginals })
-      setStatusMessage({ type: 'success', text: 'Perfis de IA salvos com sucesso!' })
+      setStatusMessage({ type: 'success', text: 'Todas as configurações foram salvas no banco de dados.' })
       await loadSettings()
     } catch (e) {
       console.error(e)
-      setStatusMessage({ type: 'error', text: 'Erro ao salvar perfis de IA.' })
+      setStatusMessage({ type: 'error', text: 'Erro ao salvar configurações no banco.' })
     } finally {
       setSaving(false)
     }
@@ -366,7 +391,7 @@ export function Settings() {
 
               {models.length > 0 && (
                 <div style={{ color: theme.colors.textMuted, fontSize: '0.72rem' }}>
-                  {models.length} modelo(s) real(is) carregado(s) para {provider.label}. O sistema não substitui automaticamente o modelo escolhido.
+                  {models.length} modelo(s) real(is) salvo(s) para {provider.label}. Atualizado em {profile.modelsUpdatedAt ? new Date(profile.modelsUpdatedAt).toLocaleString() : 'agora'}.
                 </div>
               )}
               {modelError && (
@@ -409,7 +434,7 @@ export function Settings() {
             Sair
           </button>
           <button type="submit" disabled={saving} style={{ padding: '10px 24px', borderRadius: theme.radius.md, background: theme.colors.gradient, color: 'white', border: 'none', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', boxShadow: theme.shadows.glow, opacity: saving ? 0.7 : 1 }}>
-            {saving ? 'Salvando...' : 'Salvar Perfis de IA'}
+            {saving ? 'Salvando...' : 'Salvar todas as configurações'}
           </button>
         </div>
       </form>
