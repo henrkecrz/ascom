@@ -121,6 +121,8 @@ export type ChecklistItem = { order: number; step: string; status: string }
 export type ChatMessage = { role: 'user' | 'assistant'; text: string; documents?: { id: number; name: string; docType: string; summary: string; planSection: string }[]; source?: string }
 export type QuickQuestion = { question: string; intent: string }
 
+import { PlanHealthData } from './types'
+
 export const api = {
   get, post, del, login, logout, isLoggedIn,
   files: {
@@ -150,7 +152,7 @@ export const api = {
       request<any>('/api/crisis/checklist/progress', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ progress }) }),
   },
   health: {
-    get: (signal?: AbortSignal) => get<any>('/api/plan/health', signal),
+    get: (signal?: AbortSignal) => get<PlanHealthData>('/api/plan/health', signal),
     gaps: (signal?: AbortSignal) => get<any>('/api/plan/gaps', signal),
   },
   graph: {
@@ -222,11 +224,16 @@ export const api = {
       request<any>('/api/calendar/check-day', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ date, docs_analyzed: docsAnalyzed }) }),
     uncheckDay: (date: string) =>
       request<any>('/api/calendar/check-day', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ date }) }),
+    checkMonth: (year: number, month: number) =>
+      request<any>('/api/calendar/check-month', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ year, month }) }),
     kpi: (year?: number, signal?: AbortSignal) => get<any>(`/api/calendar/kpi${year ? `?year=${year}` : ''}`, signal),
   },
   advisor: {
     summary: (year?: number, signal?: AbortSignal) => get<any>(`/api/advisor/summary${year ? `?year=${year}` : ''}`, signal),
     recommendations: (year?: number, signal?: AbortSignal) => get<any>(`/api/advisor/recommendations${year ? `?year=${year}` : ''}`, signal),
+  },
+  reports: {
+    get: (signal?: AbortSignal) => get<any>('/api/reports', signal),
   },
   generator: {
     pressRelease: (data: any) => post<any>('/api/generator/press-release', data),

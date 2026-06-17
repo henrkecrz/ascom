@@ -317,7 +317,7 @@ function ResultCard({ result, onClick, index }: { result: SearchResult; onClick:
           flexDirection: 'column',
           border: `1px solid ${scoreColor}25`,
         }}>
-          <span style={{ fontSize: '0.7rem', fontWeight: 700, color: scoreColor }}>{(result.score).toFixed(0)}%</span>
+          <span style={{ fontSize: '0.7rem', fontWeight: 700, color: scoreColor }}>{(result.score).toFixed(0)}</span>
           <span style={{ fontSize: '0.5rem', color: scoreColor, opacity: 0.6 }}>score</span>
         </div>
       </div>

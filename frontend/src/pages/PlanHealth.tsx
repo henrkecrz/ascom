@@ -1,12 +1,19 @@
 import { useState, useEffect } from 'react'
 import { useTheme } from '../ThemeContext'
 import { api } from '../api'
+import { PlanHealthData } from '../types'
 import {
   Activity, Calendar, TrendingUp, AlertTriangle, CheckCircle2,
   FileText, Download
 } from 'lucide-react'
 
 const accent = 'oklch(58% 0.16 255)'
+
+interface CalendarKpi {
+  totalDocuments: number
+  extractionRate: number
+  daysProgress: number
+}
 
 const sections = [
   { key: 'crises', label: 'Crises', color: 'oklch(58% 0.19 30)' },
@@ -21,19 +28,29 @@ const sections = [
 export function PlanHealth() {
   const { theme } = useTheme()
   const t = theme.colors
-  const [data, setData] = useState<any>(null)
-  const [kpi, setKpi] = useState<any>(null)
+  const [data, setData] = useState<PlanHealthData | null>(null)
+  const [kpi, setKpi] = useState<CalendarKpi | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     Promise.all([
-      api.health.get().catch(() => null),
-      api.calendar.kpi().catch(() => null),
-    ]).then(([h, k]) => { setData(h); setKpi(k) }).catch(() => {}).finally(() => setLoading(false))
+      api.health.get().catch(err => { console.error('Health fetch failed:', err); return null }),
+      api.calendar.kpi().catch(err => { console.error('KPI fetch failed:', err); return null }),
+    ]).then(([h, k]) => {
+      if (!h && !k) setError('Não foi possível carregar os dados de saúde. Verifique a conexão com o servidor.')
+      setData(h); setKpi(k)
+    }).finally(() => setLoading(false))
   }, [])
 
   if (loading) return <LoadingSkeleton theme={theme} />
-  if (!data) return <div style={{ padding: 40, textAlign: 'center', color: t.textMuted, fontSize: '0.85rem' }}>Erro ao carregar dados</div>
+  if (!data) return (
+    <div style={{ padding: 40, textAlign: 'center', color: t.textMuted, fontSize: '0.85rem' }}>
+      <AlertTriangle size={24} style={{ color: t.warning, marginBottom: 8 }} />
+      <div>{error || 'Erro ao carregar dados de saúde do plano.'}</div>
+      <button onClick={() => { setLoading(true); setError(null); Promise.all([api.health.get().catch(() => null), api.calendar.kpi().catch(() => null)]).then(([h, k]) => { setData(h); setKpi(k) }).finally(() => setLoading(false)) }} style={{ marginTop: 12, padding: '6px 16px', background: accent, color: '#fff', border: 'none', borderRadius: theme.radius.sm, cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}>Tentar Novamente</button>
+    </div>
+  )
 
   const calendarFactor = kpi ? (kpi.daysProgress / 100) : 1
   const baseScore = data.overallScore || 80

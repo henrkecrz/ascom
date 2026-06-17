@@ -1,7 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useTheme } from '../ThemeContext'
-
-import { API_BASE as API } from '../api'
+import { api } from '../api'
 
 interface ReportDoc {
   id: number; name: string; extension: string; size_formatted: string
@@ -28,16 +27,16 @@ export function ExecutiveReports({ onSelectDoc }: Props) {
   const [search, setSearch] = useState('')
 
   useEffect(() => {
-    fetch(`${API}/api/reports`).then(r => r.json()).then(setData).catch(console.error).finally(() => setLoading(false))
+    api.reports.get().then(setData).catch(err => console.error('Failed to load reports:', err)).finally(() => setLoading(false))
   }, [])
 
   if (loading) return <LoadingSkeleton />
   if (!data || !data.reports) return <div style={{ textAlign: 'center', padding: 60, color: theme.colors.textMuted }}>Nenhum relatório disponível</div>
 
-  const filtered = (data.reports || []).filter(r =>
+  const filtered = useMemo(() => (data.reports || []).filter(r =>
     !search || (r.clusterName || '').toLowerCase().includes(search.toLowerCase()) ||
     (r.topKeywords || []).some(k => (k.word || '').toLowerCase().includes(search.toLowerCase()))
-  ) || []
+  ), [data.reports, search])
 
   if (selected) {
     return <ReportDetail report={selected} onBack={() => setSelected(null)} onSelectDoc={onSelectDoc} />

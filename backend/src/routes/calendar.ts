@@ -211,6 +211,65 @@ router.delete('/api/calendar/check-day', (req: Request, res: Response) => {
 });
 
 /**
+ * PUT /api/calendar/check-month
+ * Bulk-mark all days with documents in a given month as checked.
+ * Body: { year: 2026, month: 3 }
+ */
+router.put('/api/calendar/check-month', (req: Request, res: Response) => {
+  const db = getDatabase();
+  if (!db) return res.status(500).json({ error: 'Banco não inicializado' });
+
+  const { year, month } = req.body;
+  if (!year || !month) return res.status(400).json({ error: 'year e month são obrigatórios' });
+
+  const monthPadded = String(month).padStart(2, '0');
+  const datePrefix = `${year}-${monthPadded}`;
+
+  try {
+    // Find all days in this month that have documents
+    const daysStmt = db.prepare(`
+      SELECT 
+        strftime('%Y-%m-%d', last_modified) as check_date,
+        CAST(strftime('%d', last_modified) AS INTEGER) as day,
+        COUNT(*) as count
+      FROM files
+      WHERE last_modified LIKE ?
+      GROUP BY check_date
+      ORDER BY day
+    `);
+    daysStmt.bind([`${datePrefix}%`]);
+
+    const rows: { check_date: string; day: number; count: number }[] = [];
+    while (daysStmt.step()) {
+      const row = daysStmt.getAsObject() as any;
+      rows.push({
+        check_date: String(row.check_date),
+        day: Number(row.day),
+        count: Number(row.count),
+      });
+    }
+    daysStmt.free();
+
+    const now = new Date().toISOString();
+    let inserted = 0;
+    for (const row of rows) {
+      db.run(`
+        INSERT OR REPLACE INTO calendar_checks (check_date, year, month, day, documents_count, docs_analyzed, notes, completed_at)
+        VALUES (?, ?, ?, ?, ?, ?, '', ?)
+      `, [row.check_date, year, month, row.day, row.count, row.count, now]);
+      inserted++;
+    }
+    scheduleSave();
+
+    logger.info(`Bulk check-month: ${inserted} days marked for ${datePrefix}`);
+    res.json({ success: true, year, month, daysMarked: inserted });
+  } catch (err: any) {
+    logger.error('Failed to bulk check month', { error: err.message });
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
  * GET /api/calendar/kpi
  * Return KPIs based on checked days and document progress
  */

@@ -1,13 +1,16 @@
-export interface FileInfo {
+export interface BaseDocument {
   id: number;
   name: string;
+  last_modified: string;
+  size_formatted: string;
+  category?: string;
+  extension?: string | null;
+}
+
+export interface FileInfo extends BaseDocument {
   full_path: string;
   relative_path: string;
-  extension: string | null;
   size_bytes: number;
-  size_formatted: string;
-  last_modified: string;
-  category: string;
   parent_folder: string;
   depth: number;
 }
@@ -131,15 +134,21 @@ export interface CrisisOverview {
 // Health
 export interface PlanHealthData {
   overallScore: number;
-  sectionCoverage: Array<{
+  sectionScores?: Array<{
+    section: string;
+    score: number;
+  }>;
+  sectionCoverage?: Array<{
     section: string;
     docCount: number;
     status: 'ok' | 'warning' | 'critical';
     percentage: number;
   }>;
-  gaps: Array<{
-    severity: 'critical' | 'warning';
-    description: string;
+  gaps?: Array<{
+    section: string;
+    detail: string;
+    severity: 'high' | 'medium' | 'low' | 'critical' | 'warning';
+    description?: string;
   }>;
 }
 

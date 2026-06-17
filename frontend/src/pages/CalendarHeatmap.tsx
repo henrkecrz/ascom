@@ -91,14 +91,10 @@ export function CalendarHeatmap() {
 
   const checkAllMonth = async (month: number) => {
     if (!heatmap) return
-    const days = heatmap.daily.filter(d => d.month === month && d.count > 0 && !d.checked)
-    for (const day of days) {
-      const dateStr = `${year}-${String(day.month).padStart(2, '0')}-${String(day.day).padStart(2, '0')}`
-      try {
-        await api.calendar.checkDay(dateStr, day.count)
-      } catch (e) { console.error(e) }
-    }
-    await loadData()
+    try {
+      await api.calendar.checkMonth(year, month)
+      await loadData()
+    } catch (e) { console.error(e) }
   }
 
   const uncheckAllMonth = async (month: number) => {

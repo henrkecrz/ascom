@@ -1,26 +1,21 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
-import { api, ChatMessage } from '../api'
-import { MessageSquare, Sparkles, Plus, FileText, X, Download } from 'lucide-react'
+import { ChatMessage } from '../api'
+import { MessageSquare, Sparkles, Plus, Download } from 'lucide-react'
 import { MessageBubble } from '../components/MessageBubble'
 import { ChatInput } from '../components/ChatInput'
 import { useQuickQuestions, useAskQuestion } from '../hooks/useApi'
 
-interface DocPreview {
-  id: number; name: string; extension: string | null;
-  raw_text?: string; summary?: string; keywords?: string;
-  doc_type?: string; category?: string; plan_section?: string; size_formatted?: string
-}
+
 
 interface Props { onSelectDoc?: (id: number) => void }
 
 const accent = 'oklch(58% 0.16 255)'
 
-export function ConsultChat({ onSelectDoc: _onSelectDoc }: Props) {
+export function ConsultChat({ onSelectDoc }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([
     { role: 'assistant', text: 'Olá! Faça uma pergunta sobre o Plano de Comunicação da Novacap. Posso ajudar com protocolos, calendário, porta-vozes e muito mais.' },
   ])
   const [input, setInput] = useState('')
-  const [preview, setPreview] = useState<DocPreview | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const askMutation = useAskQuestion()
   const { data: quickQuestionsData } = useQuickQuestions()
@@ -45,10 +40,9 @@ export function ConsultChat({ onSelectDoc: _onSelectDoc }: Props) {
   const handleClear = useCallback(() => setInput(''), [])
   const handleInputChange = useCallback((value: string) => setInput(value), [])
 
-  const openPreview = useCallback(async (id: number) => {
-    try { setPreview(await api.files.get(id)) }
-    catch { setPreview({ id, name: 'Erro ao carregar', extension: null }) }
-  }, [])
+  const openPreview = useCallback((id: number) => {
+    if (onSelectDoc) onSelectDoc(id)
+  }, [onSelectDoc])
 
   const downloadHistory = () => {
     const now = new Date()
@@ -160,43 +154,6 @@ export function ConsultChat({ onSelectDoc: _onSelectDoc }: Props) {
       <div className="text-center" style={{ fontSize: '0.62rem', color: 'var(--text-muted)', marginTop: 6 }}>
         Respostas baseadas nos documentos indexados. Fontes consultadas são exibidas junto à resposta.
       </div>
-
-      {preview && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, background: 'rgba(0,0,0,0.6)' }} onClick={() => setPreview(null)}>
-          <div className="flex flex-col" style={{ background: 'var(--bg-surface)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-subtle)', width: '90%', maxWidth: 700, maxHeight: '80vh', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
-            <div className="flex items-center gap-xs" style={{ padding: '14px 18px', borderBottom: '1px solid var(--border-subtle)' }}>
-              <FileText size={16} style={{ color: accent }} />
-              <div className="flex-1 min-w-0">
-                <div style={{ fontSize: '0.82rem', fontWeight: 600 }}>{preview.name}</div>
-                {preview.doc_type && <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: 1 }}>{preview.doc_type.replace(/_/g, ' ')}</div>}
-              </div>
-              <button onClick={() => setPreview(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 4 }}>
-                <X size={16} />
-              </button>
-            </div>
-            <div className="flex-1" style={{ overflowY: 'auto', padding: '16px 18px' }}>
-              {preview.summary && (
-                <div style={{ marginBottom: 14 }}>
-                  <div style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>Resumo</div>
-                  <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>{preview.summary}</p>
-                </div>
-              )}
-              {preview.keywords && (
-                <div className="flex flex-wrap" style={{ gap: 4, marginBottom: 14 }}>
-                  {preview.keywords.split(',').filter(Boolean).map((kw, i) => (
-                    <span key={i} style={{ background: `${accent}12`, color: accent, padding: '2px 8px', borderRadius: 4, fontSize: '0.68rem', border: `1px solid ${accent}20` }}>{kw}</span>
-                  ))}
-                </div>
-              )}
-              {preview.raw_text ? (
-                <pre style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: 1.6, whiteSpace: 'pre-wrap', fontFamily: 'var(--font-mono)' }}>{preview.raw_text}</pre>
-              ) : (
-                <p style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>Conteúdo não disponível para este arquivo.</p>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
